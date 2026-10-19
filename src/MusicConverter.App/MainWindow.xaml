@@ -1,0 +1,153 @@
+<Window x:Class="MusicConverter.App.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:vm="clr-namespace:MusicConverter.App.ViewModels"
+        Title="Music Converter — music notation to MusicXML"
+        Icon="{StaticResource BassClefIcon}"
+        Width="900" Height="760" MinWidth="640" MinHeight="520"
+        WindowStartupLocation="CenterScreen">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <Style x:Key="StatusDot" TargetType="Ellipse">
+            <Setter Property="Width" Value="14" />
+            <Setter Property="Height" Value="14" />
+            <Setter Property="Fill" Value="Gray" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Style.Triggers>
+                <DataTrigger Binding="{Binding Status}" Value="{x:Static vm:ConversionStatus.Running}">
+                    <Setter Property="Fill" Value="DodgerBlue" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="{x:Static vm:ConversionStatus.Succeeded}">
+                    <Setter Property="Fill" Value="SeaGreen" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="{x:Static vm:ConversionStatus.Failed}">
+                    <Setter Property="Fill" Value="Firebrick" />
+                </DataTrigger>
+                <DataTrigger Binding="{Binding Status}" Value="{x:Static vm:ConversionStatus.Cancelled}">
+                    <Setter Property="Fill" Value="Orange" />
+                </DataTrigger>
+            </Style.Triggers>
+        </Style>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="Margin" Value="4,0,0,0" />
+        </Style>
+        <Style TargetType="ProgressBar">
+            <Setter Property="Height" Value="14" />
+            <Setter Property="Maximum" Value="100" />
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+            <Image Source="{StaticResource BassClefIcon}" Width="36" Height="36" />
+            <TextBlock Text="Music Converter" FontSize="20" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center" />
+            <CheckBox Content="Batch (folder) mode" IsChecked="{Binding IsBatchMode}" Margin="24,0,0,0" VerticalAlignment="Center" />
+            <CheckBox Content="Include subfolders" IsChecked="{Binding Recursive}" Margin="14,0,0,0" VerticalAlignment="Center"
+                      Visibility="{Binding IsBatchMode, Converter={StaticResource BoolToVis}}" />
+            <CheckBox Content="Overwrite existing" IsChecked="{Binding Overwrite}" Margin="14,0,0,0" VerticalAlignment="Center"
+                      Visibility="{Binding IsBatchMode, Converter={StaticResource BoolToVis}}" />
+        </StackPanel>
+
+        <Grid Grid.Row="1" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="90" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{Binding InputLabel}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Text="{Binding InputPath, UpdateSourceTrigger=PropertyChanged}" Padding="4" />
+            <Button Grid.Column="2" Content="Browse…" Command="{Binding BrowseInputCommand}" />
+        </Grid>
+
+        <Grid Grid.Row="2" Margin="0,0,0,8">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="90" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <TextBlock Text="{Binding OutputLabel}" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Text="{Binding OutputPath, UpdateSourceTrigger=PropertyChanged}" Padding="4"
+                     ToolTip="Batch mode: leave empty to write each result next to its source file" />
+            <Button Grid.Column="2" Content="Browse…" Command="{Binding BrowseOutputCommand}" />
+        </Grid>
+
+        <DockPanel Grid.Row="3" Margin="0,0,0,12">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Content="Convert" Command="{Binding ConvertCommand}" IsDefault="True" />
+                <Button Content="Cancel" Command="{Binding CancelCommand}" />
+            </StackPanel>
+            <TextBlock Text="Detected format:" VerticalAlignment="Center" />
+            <TextBlock Text="{Binding DetectedFormat}" FontWeight="SemiBold" Margin="6,0,18,0" VerticalAlignment="Center" />
+            <TextBlock Text="MusicXML version:" VerticalAlignment="Center" />
+            <ComboBox ItemsSource="{Binding AvailableVersions}" SelectedItem="{Binding SelectedVersion}"
+                      Width="80" Margin="6,0,0,0" HorizontalAlignment="Left" />
+        </DockPanel>
+
+        <GroupBox Grid.Row="4" Header="Progress" Padding="8" Margin="0,0,0,8">
+            <StackPanel>
+                <Grid Margin="0,0,0,6">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Ellipse Style="{StaticResource StatusDot}" Margin="0,0,8,0" />
+                    <TextBlock Grid.Column="1" Text="{Binding StatusText}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                </Grid>
+                <ProgressBar Value="{Binding OverallPercent, Mode=OneWay}" />
+                <TextBlock Text="{Binding ProgressMessage}" Margin="0,4,0,8" Foreground="DimGray" TextTrimming="CharacterEllipsis" />
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="90" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition />
+                        <RowDefinition />
+                        <RowDefinition />
+                    </Grid.RowDefinitions>
+                    <TextBlock Text="Parsing" VerticalAlignment="Center" />
+                    <ProgressBar Grid.Column="1" Value="{Binding ParsingPercent, Mode=OneWay}" Margin="0,2" />
+                    <TextBlock Grid.Row="1" Text="Conversion" VerticalAlignment="Center" />
+                    <ProgressBar Grid.Row="1" Grid.Column="1" Value="{Binding ConvertingPercent, Mode=OneWay}" Margin="0,2" />
+                    <TextBlock Grid.Row="2" Text="Serialization" VerticalAlignment="Center" />
+                    <ProgressBar Grid.Row="2" Grid.Column="1" Value="{Binding SerializingPercent, Mode=OneWay}" Margin="0,2" />
+                </Grid>
+            </StackPanel>
+        </GroupBox>
+
+        <Border Grid.Row="5" Background="#FFFDE7E7" BorderBrush="Firebrick" BorderThickness="1" Padding="8" Margin="0,0,0,8">
+            <Border.Style>
+                <Style TargetType="Border">
+                    <Setter Property="Visibility" Value="Collapsed" />
+                    <Style.Triggers>
+                        <DataTrigger Binding="{Binding HasError}" Value="True">
+                            <Setter Property="Visibility" Value="Visible" />
+                        </DataTrigger>
+                    </Style.Triggers>
+                </Style>
+            </Border.Style>
+            <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Foreground="Firebrick" />
+        </Border>
+
+        <GroupBox Grid.Row="6" Header="Log">
+            <DockPanel>
+                <Button DockPanel.Dock="Bottom" Content="Clear log" Command="{Binding ClearLogCommand}"
+                        HorizontalAlignment="Right" Margin="0,6,0,0" />
+                <ListBox x:Name="LogList" ItemsSource="{Binding LogEntries}" FontFamily="Consolas" FontSize="12"
+                         ScrollViewer.HorizontalScrollBarVisibility="Auto" />
+            </DockPanel>
+        </GroupBox>
+    </Grid>
+</Window>

@@ -1,0 +1,22 @@
+!NoteWorthyComposer(2.75)
+|SongInfo|Title:"Twinkle, Twinkle, Little Star"|Author:"Traditional"
+|AddStaff|Name:"Melody"
+|Clef|Type:Treble
+|Key|Signature:
+|TimeSig|Signature:4/4
+|Note|Dur:4th|Pos:-6
+|Note|Dur:4th|Pos:-6
+|Note|Dur:4th|Pos:-2
+|Note|Dur:4th|Pos:-2
+|Bar
+|Note|Dur:4th|Pos:-1
+|Note|Dur:4th|Pos:-1
+|Note|Dur:Half|Pos:-2
+|Bar
+|Chord|Dur:Half|Pos:-6,-4,-2
+|Rest|Dur:4th
+|Note|Dur:8th|Pos:-3
+|Note|Dur:8th|Pos:-3^
+|Bar
+|Note|Dur:Whole|Pos:-3
+|Bar|Style:SectionClose

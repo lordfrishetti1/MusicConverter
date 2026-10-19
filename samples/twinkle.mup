@@ -1,0 +1,25 @@
+// Twinkle, Twinkle, Little Star - Mup
+score
+	time=4/4
+	key=1#
+	staffs=1
+	clef=treble
+
+staff 1
+	label="Melody"
+
+header
+	title "Twinkle, Twinkle, Little Star"
+	title2 "" "" "Traditional"
+
+music
+1: 4g; g; d+; d+;
+bar
+1: e+; e+; 2d+;
+bar
+1: 4c+eg; c+; b; b;
+bar
+1: a; a; 2g tie;
+bar
+1: 2g; {4a; b; c+;} 3;
+endbar
