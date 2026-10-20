@@ -41,3 +41,7 @@ dotnet build MusicConverter.slnx
 dotnet test tests\MusicConverter.Tests
 dotnet run --project src\MusicConverter.App
 ```
+
+## License
+
+MIT - see [LICENSE](LICENSE).
