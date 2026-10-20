@@ -32,7 +32,7 @@ public class LyricTests
             "|Note|Dur:4th|Pos:0\n|Note|Dur:4th|Pos:1\n|Rest|Dur:4th\n|Note|Dur:4th|Pos:2\n|Bar\n" +
             "|Lyrics|Placement:Bottom\n|Lyric1|Text:\"1._A a-men\\n\"\n!NoteWorthyComposer-End\n");
         var doc = await new NwcTxtConverter().ConvertAsync(path, null);
-        Assert.Equal("1. A:single a:begin men:end", Lyrics(doc));
+        Assert.Equal("A:single a:begin men:end", Lyrics(doc));
     }
 
     [Fact]

@@ -345,7 +345,8 @@ internal sealed class NwcTxtParser
                 break;
             case var t when t.Length > 5 && t.StartsWith("lyric", StringComparison.Ordinal) && int.TryParse(t[5..], out var verse):
                 if (v.TryGetValue("Text", out var lyric))
-                    CurrentStaff().Lyrics.Add((verse, lyric.Replace("\\n", " ").Replace("\\r", " ")));
+                    CurrentStaff().Lyrics.Add((verse, System.Text.RegularExpressions.Regex.Replace(
+                        lyric.Replace("\\n", " ").Replace("\\r", " "), @"^\s*\d+[.:)]_*\s*", "")));
                 break;
             default:
                 if (_warnedTypes.Add(type)) _ctx.Warn($"Unsupported NWCTXT object '{type}' ignored.");
