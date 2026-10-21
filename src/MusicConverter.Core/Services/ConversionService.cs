@@ -4,7 +4,9 @@ using MusicConverter.MusicXml;
 
 namespace MusicConverter.Services;
 
-public sealed record ConversionResult(string InputPath, string OutputPath, string FormatName, string MusicXmlVersion, int WarningCount);
+public sealed record ConversionResult(
+    string InputPath, string OutputPath, string FormatName, string MusicXmlVersion, int WarningCount,
+    IReadOnlyList<string>? Warnings = null);
 
 /// <summary>End-to-end pipeline: pick converter → parse → map → serialize, with progress and cancellation.</summary>
 public sealed class ConversionService
@@ -54,7 +56,7 @@ public sealed class ConversionService
         progress?.Report(ConversionProgress.ForStage(ConversionStage.Completed, 1, "Conversion complete"));
 
         _logger.Info($"Pipeline finished: '{outputPath}' ({document.Warnings.Count} warning(s)).");
-        return new ConversionResult(inputPath, outputPath, converter.FormatName, version, document.Warnings.Count);
+        return new ConversionResult(inputPath, outputPath, converter.FormatName, version, document.Warnings.Count, document.Warnings.ToArray());
     }
 
     private ConversionException Log(ConversionException exception)

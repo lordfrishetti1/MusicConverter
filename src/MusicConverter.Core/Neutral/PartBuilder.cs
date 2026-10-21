@@ -73,12 +73,53 @@ public sealed class PartBuilder
         if (_current.All(n => n.IsGrace)) return; // grace notes wait for the note they decorate
         var measure = new NeutralMeasure { Number = Part.Measures.Count + 1, Attributes = _pending };
         measure.Notes.AddRange(_current);
+        if (_pendingStart) measure.RepeatStart = true;
+        if (_pendingEnding != null) { measure.EndingNumbers = _pendingEnding; measure.EndingStart = true; }
+        _pendingStart = false;
+        _pendingEnding = null;
         Part.Measures.Add(measure);
         _current.Clear();
         _pending = null;
         _ticks = 0;
         _pickupCapacity = null;
         MeasureCompleted?.Invoke();
+    }
+
+    private bool _pendingStart;
+    private string? _pendingEnding;
+    private bool HasOpenNotes => _current.Any(n => !n.IsGrace);
+
+    /// <summary>A forward repeat sign starts the next measure to be written.</summary>
+    public void MarkRepeatStart() => _pendingStart = true;
+
+    /// <summary>Undoes <see cref="MarkRepeatStart"/> when the repeat turns out not to be representable.</summary>
+    public void UnmarkRepeatStart(int firstMeasureIndex)
+    {
+        _pendingStart = false;
+        if (firstMeasureIndex >= 0 && firstMeasureIndex < Part.Measures.Count) Part.Measures[firstMeasureIndex].RepeatStart = false;
+    }
+
+    /// <summary>A volta bracket (e.g. "1" or "1, 2") starts with the next measure to be written.</summary>
+    public void MarkEndingStart(string numbers) => _pendingEnding = numbers;
+
+    /// <summary>Marks the measure that ends at the current position as ending a backward repeat.</summary>
+    public bool MarkRepeatEnd(int times = 2)
+    {
+        if (HasOpenNotes) Flush();
+        if (Part.Measures.Count == 0) return false;
+        var last = Part.Measures[^1];
+        last.RepeatEnd = true;
+        last.RepeatTimes = times;
+        return true;
+    }
+
+    /// <summary>Closes the volta bracket on the measure that ends at the current position.</summary>
+    public bool MarkEndingStop()
+    {
+        if (HasOpenNotes) Flush();
+        if (Part.Measures.Count == 0) return false;
+        Part.Measures[^1].EndingStop = true;
+        return true;
     }
 
     private NeutralAttributes Pending() => _pending ??= new NeutralAttributes();

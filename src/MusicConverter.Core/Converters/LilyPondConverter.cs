@@ -862,6 +862,8 @@ internal sealed class LilyPondParser
             }
             foreach (var note in measure.Notes) st.Builder.Add(note);
             st.Builder.Flush();
+            if (st.Builder.Part.Measures.Count > 0 && measure.Notes.Count > 0)
+                CopyRepeatMarks(measure, st.Builder.Part.Measures[^1]);
         }
         st.Builder.AutoFlush = autoFlush;
 
@@ -1547,12 +1549,104 @@ internal sealed class LilyPondParser
         var start = _pos;
         // LilyPond resolves relative pitches once for the repeated body, so every copy starts from the same reference.
         var (startStep, startOctave) = (st.PrevStep, st.PrevOctave);
+
+        if (kind == "volta" && count >= 2 && st.Builder.PendingTicks == 0)
+        {
+            var firstMeasure = st.Builder.MeasureCount;
+            st.Builder.MarkRepeatStart();
+            ParseItem(st);
+            if (st.Builder.PendingTicks == 0 && st.Builder.MeasureCount > firstMeasure)
+            {
+                SkipWs();
+                if (StartsWith("\\alternative")) ParseAlternatives(st, count);
+                else st.Builder.MarkRepeatEnd(count);
+                return;
+            }
+
+            // The body does not end on a barline, so no repeat sign can describe it: play the copies out instead.
+            st.Builder.UnmarkRepeatStart(firstMeasure);
+            for (var i = 1; i < count; i++)
+            {
+                _pos = start;
+                (st.PrevStep, st.PrevOctave) = (startStep, startOctave);
+                ParseItem(st);
+            }
+            return;
+        }
+
         for (var i = 0; i < count; i++)
         {
             _pos = start;
             (st.PrevStep, st.PrevOctave) = (startStep, startOctave);
             ParseItem(st);
         }
+    }
+
+    private static void CopyRepeatMarks(NeutralMeasure from, NeutralMeasure to)
+    {
+        to.RepeatStart |= from.RepeatStart;
+        if (from.RepeatEnd) { to.RepeatEnd = true; to.RepeatTimes = from.RepeatTimes; }
+        if (from.EndingNumbers != null) to.EndingNumbers = from.EndingNumbers;
+        to.EndingStart |= from.EndingStart;
+        to.EndingStop |= from.EndingStop;
+    }
+
+    /// <summary>Parses <c>\alternative { {...} {...} }</c> after a repeat body into numbered volta endings.</summary>
+    private void ParseAlternatives(StaffState st, int count)
+    {
+        _pos += "\\alternative".Length;
+        SkipWs();
+        if (Peek() != '{') throw Fail("Expected '{' after \\alternative");
+        _pos++;
+
+        var (afterBodyStep, afterBodyOctave) = (st.PrevStep, st.PrevOctave);
+        var total = CountAlternatives();
+        var alternatives = 0;
+        while (true)
+        {
+            SkipWs();
+            if (Eof) throw Fail("Unterminated \\alternative block");
+            if (Peek() == '}') { _pos++; break; }
+            Tick();
+            (st.PrevStep, st.PrevOctave) = (afterBodyStep, afterBodyOctave);
+            alternatives++;
+
+            // With fewer alternatives than repeats the first one is played on every earlier pass.
+            var firstPasses = Math.Max(1, count - total + 1);
+            st.Builder.MarkEndingStart(alternatives == 1
+                ? string.Join(", ", Enumerable.Range(1, firstPasses))
+                : (firstPasses + alternatives - 1).ToString());
+            ParseItem(st);
+            st.Builder.MarkEndingStop();
+            if (alternatives < total) st.Builder.MarkRepeatEnd();
+        }
+    }
+
+    // Number of braced alternatives in the \alternative block whose opening '{' has just been consumed.
+    private int CountAlternatives()
+    {
+        var depth = 0;
+        var items = 0;
+        for (var p = _pos; p < _s.Length; p++)
+        {
+            var c = _s[p];
+            if (c == '"')
+            {
+                p = _s.IndexOf('"', p + 1);
+                if (p < 0) break;
+            }
+            else if (c == '{')
+            {
+                if (depth == 0) items++;
+                depth++;
+            }
+            else if (c == '}')
+            {
+                if (depth == 0) break;
+                depth--;
+            }
+        }
+        return Math.Max(1, items);
     }
 
     private int ReadPlainDuration()

@@ -40,6 +40,13 @@ public sealed class MusicXmlMeasure
     public int Number { get; set; }
     public MusicXmlAttributes? Attributes { get; set; }
     public List<MusicXmlNote> Notes { get; } = new();
+
+    public bool RepeatStart { get; set; }
+    public bool RepeatEnd { get; set; }
+    public int RepeatTimes { get; set; } = 2;
+    public string? EndingNumbers { get; set; }
+    public bool EndingStart { get; set; }
+    public bool EndingStop { get; set; }
 }
 
 public sealed class MusicXmlAttributes
@@ -66,6 +73,10 @@ public sealed class MusicXmlNote
     public bool TieStop { get; set; }
     public int? TupletActual { get; set; }
     public int? TupletNormal { get; set; }
+
+    /// <summary>First / last note of a tuplet group; a bracket is written between them.</summary>
+    public bool TupletStart { get; set; }
+    public bool TupletStop { get; set; }
     public int Voice { get; set; } = 1;
 
     /// <summary>Divisions to step back (a &lt;backup&gt; element) before this note; used between voices.</summary>

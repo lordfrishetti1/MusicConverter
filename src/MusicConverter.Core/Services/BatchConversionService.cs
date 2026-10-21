@@ -36,6 +36,10 @@ public sealed record BatchResult(IReadOnlyList<BatchItemResult> Items)
     public int Succeeded => Items.Count(i => i.Status == BatchItemStatus.Succeeded);
     public int Failed => Items.Count(i => i.Status == BatchItemStatus.Failed);
     public int Skipped => Items.Count(i => i.Status == BatchItemStatus.Skipped);
+
+    /// <summary>Converted files whose conversion dropped or approximated content.</summary>
+    public IReadOnlyList<BatchItemResult> WithWarnings =>
+        Items.Where(i => i.Result is { WarningCount: > 0 }).ToList();
 }
 
 /// <summary>Converts every supported file in a directory. A failing file never stops the batch; cancellation does.</summary>
@@ -144,7 +148,9 @@ public sealed class BatchConversionService
 
         progress?.Report(new BatchProgress(files.Count, files.Count, string.Empty, 100, "Batch complete"));
         var batch = new BatchResult(results);
-        _logger.Info($"Batch finished: {batch.Succeeded} succeeded, {batch.Failed} failed, {batch.Skipped} skipped.");
+        _logger.Info($"Batch finished: {batch.Succeeded} succeeded, {batch.Failed} failed, {batch.Skipped} skipped, {batch.WithWarnings.Count} with warnings.");
+        foreach (var item in batch.WithWarnings)
+            _logger.Warning($"'{item.InputPath}' converted with {item.Result!.WarningCount} warning(s): {string.Join(" | ", item.Result.Warnings ?? Array.Empty<string>())}");
         return batch;
     }
 

@@ -299,6 +299,12 @@ internal sealed class NwcTxtParser
                 var staff = CurrentStaff();
                 staff.CloseBar();
                 staff.MeasureAccidentals.Clear();
+                if (v.TryGetValue("Style", out var barStyle))
+                {
+                    if (barStyle.Contains("RepeatClose", StringComparison.OrdinalIgnoreCase))
+                        staff.Builder.MarkRepeatEnd(v.TryGetValue("Repeat", out var times) && int.TryParse(times, out var n) ? Math.Clamp(n, 2, 64) : 2);
+                    if (barStyle.Contains("RepeatOpen", StringComparison.OrdinalIgnoreCase)) staff.Builder.MarkRepeatStart();
+                }
                 break;
             case "note":
                 HandleNote(v, isChord: false);

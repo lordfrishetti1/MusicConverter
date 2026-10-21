@@ -112,8 +112,10 @@ internal sealed class MeiParser
                 case "measure":
                     ReadMeasure(child);
                     break;
-                case "section":
                 case "ending":
+                    ReadEnding(child);
+                    break;
+                case "section":
                 case "app":
                 case "lem":
                 case "mdiv":
@@ -246,6 +248,42 @@ internal sealed class MeiParser
         return staff;
     }
 
+    private string? _ending;
+    private readonly HashSet<string> _endingStarted = new();
+
+    private void ReadEnding(XElement ending)
+    {
+        var raw = Attr(ending, "n") ?? Attr(ending, "label") ?? string.Empty;
+        var numbers = string.Join(", ", raw.Split(new[] { ',', ' ', ';' }, StringSplitOptions.RemoveEmptyEntries)
+            .Select(p => p.TrimEnd('.')));
+        _ending = numbers.Length > 0 ? numbers : "1";
+        _endingStarted.Clear();
+        try { Walk(ending); }
+        finally
+        {
+            foreach (var key in _endingStarted)
+                if (_staves[key].Builder.Part.Measures.Count > 0) _staves[key].Builder.Part.Measures[^1].EndingStop = true;
+            _ending = null;
+            _endingStarted.Clear();
+        }
+    }
+
+    private void ApplyBarlines(Staff staff, string staffKey, XElement measureElement)
+    {
+        var measures = staff.Builder.Part.Measures;
+        if (measures.Count == 0) return;
+        var target = measures[^1];
+        var left = Attr(measureElement, "left");
+        var right = Attr(measureElement, "right");
+        if (left is "rptstart" or "rptboth") target.RepeatStart = true;
+        if (right is "rptend" or "rptboth") target.RepeatEnd = true;
+        if (_ending != null)
+        {
+            target.EndingNumbers = _ending;
+            if (_endingStarted.Add(staffKey)) target.EndingStart = true;
+        }
+    }
+
     private void ReadMeasure(XElement measure)
     {
         _measuresDone++;
@@ -272,7 +310,7 @@ internal sealed class MeiParser
             if (layers.Count > 0) ReadLayerContent(staff, layers[0]);
             _recordLayer = false;
             staff.Builder.Flush();
-
+            if (staff.Builder.MeasureCount > before) ApplyBarlines(staff, _staffKey, measure);
             // Further layers are extra voices of the same staff, laid over the measure the first layer produced.
             for (var i = 1; i < layers.Count; i++)
             {

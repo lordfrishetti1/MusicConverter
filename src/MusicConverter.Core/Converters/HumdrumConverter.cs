@@ -236,6 +236,8 @@ internal sealed class HumdrumParser
                 {
                     track.Builder.Flush();
                     MergeVoices(track.Builder);
+                    if (token.Contains(":|")) track.Builder.MarkRepeatEnd();
+                    if (token.Contains("|:")) track.Builder.MarkRepeatStart();
                 }
                 continue;
             }

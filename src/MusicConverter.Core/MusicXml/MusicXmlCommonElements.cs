@@ -19,11 +19,42 @@ internal static class MusicXmlCommonElements
 
     public static bool HasNotations(MusicXmlNote note) =>
         note.TieStart || note.TieStop || note.SlurStart || note.SlurStop || note.Fermata ||
-        note.Articulations.Count > 0 || note.Ornaments.Count > 0;
+        note.Articulations.Count > 0 || note.Ornaments.Count > 0 || note.TupletStart || note.TupletStop;
 
-    /// <summary>Adds slur, ornament, articulation and fermata children (ties are written by the caller).</summary>
+    /// <summary>Left barline carrying a forward repeat and/or the start of a volta bracket, or null.</summary>
+    public static XElement? LeftBarline(MusicXmlMeasure measure)
+    {
+        if (!measure.RepeatStart && !(measure.EndingStart && measure.EndingNumbers != null)) return null;
+        var barline = new XElement("barline", new XAttribute("location", "left"));
+        if (measure.EndingStart && measure.EndingNumbers != null)
+            barline.Add(new XElement("ending", new XAttribute("number", measure.EndingNumbers), new XAttribute("type", "start")));
+        if (measure.RepeatStart) barline.Add(new XElement("repeat", new XAttribute("direction", "forward")));
+        return barline;
+    }
+
+    /// <summary>Right barline carrying a backward repeat and/or the end of a volta bracket, or null.</summary>
+    public static XElement? RightBarline(MusicXmlMeasure measure)
+    {
+        if (!measure.RepeatEnd && !(measure.EndingStop && measure.EndingNumbers != null)) return null;
+        var barline = new XElement("barline", new XAttribute("location", "right"));
+        if (measure.EndingStop && measure.EndingNumbers != null)
+            barline.Add(new XElement("ending", new XAttribute("number", measure.EndingNumbers),
+                new XAttribute("type", measure.RepeatEnd ? "stop" : "discontinue")));
+        if (measure.RepeatEnd)
+        {
+            var repeat = new XElement("repeat", new XAttribute("direction", "backward"));
+            if (measure.RepeatTimes > 2) repeat.Add(new XAttribute("times", measure.RepeatTimes));
+            barline.Add(repeat);
+        }
+        return barline;
+    }
+
+    /// <summary>Adds tuplet, slur, ornament, articulation and fermata children (ties are written by the caller).</summary>
     public static void AddNotationExtras(XElement notations, MusicXmlNote note)
     {
+        if (note.TupletStop) notations.Add(new XElement("tuplet", new XAttribute("type", "stop"), new XAttribute("number", 1)));
+        if (note.TupletStart)
+            notations.Add(new XElement("tuplet", new XAttribute("type", "start"), new XAttribute("number", 1), new XAttribute("bracket", "yes")));
         if (note.SlurStop) notations.Add(new XElement("slur", new XAttribute("type", "stop"), new XAttribute("number", 1)));
         if (note.SlurStart) notations.Add(new XElement("slur", new XAttribute("type", "start"), new XAttribute("number", 1)));
         if (note.Ornaments.Count > 0)

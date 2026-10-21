@@ -71,6 +71,8 @@ public sealed class MusicXmlV31Writer : IMusicXmlVersionWriter
             if (attributes.HasElements) element.Add(attributes);
         }
 
+        if (MusicXmlCommonElements.LeftBarline(measure) is { } leftBarline) element.Add(leftBarline);
+
         foreach (var note in measure.Notes)
         {
             if (note.BackupBefore > 0)
@@ -83,6 +85,7 @@ public sealed class MusicXmlV31Writer : IMusicXmlVersionWriter
             element.Add(WriteNote(note));
         }
 
+        if (MusicXmlCommonElements.RightBarline(measure) is { } rightBarline) element.Add(rightBarline);
         return element;
     }
 

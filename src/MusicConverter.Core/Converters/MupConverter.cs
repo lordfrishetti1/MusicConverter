@@ -431,6 +431,8 @@ internal sealed class MupParser
                 if (!nextIsEquals && BarWords.Contains(w) && !IsWordChar(text, after))
                 {
                     StartNewMeasure();
+                    if (w is "repeatend" or "repeatboth") foreach (var s in _staves) s.Builder.MarkRepeatEnd();
+                    if (w is "repeatstart" or "repeatboth") foreach (var s in _staves) s.Builder.MarkRepeatStart();
                     i = after;
                     continue;
                 }

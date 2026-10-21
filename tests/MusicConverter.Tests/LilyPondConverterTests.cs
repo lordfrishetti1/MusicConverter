@@ -84,7 +84,21 @@ public class LilyPondConverterTests
     public async Task VariablesAndRepeats()
     {
         var doc = await ConvertText("melody = { c'1 }\n\\score { \\new Staff { \\repeat volta 2 \\melody } }");
-        Assert.Equal(2, doc.Parts[0].Measures.Count);
+        Assert.Single(doc.Parts[0].Measures);
+        Assert.True(doc.Parts[0].Measures[0].RepeatStart);
+        Assert.True(doc.Parts[0].Measures[0].RepeatEnd);
+    }
+
+    [Fact]
+    public async Task VoltaAlternativesProduceEndings()
+    {
+        var doc = await ConvertText("{ \\repeat volta 2 { c'1 } \\alternative { { d'1 } { e'1 } } }");
+        var m = doc.Parts[0].Measures;
+        Assert.Equal(3, m.Count);
+        Assert.True(m[0].RepeatStart);
+        Assert.True(m[1].EndingStart);
+        Assert.True(m[1].RepeatEnd);
+        Assert.True(m[2].EndingStart);
     }
 
     [Fact]

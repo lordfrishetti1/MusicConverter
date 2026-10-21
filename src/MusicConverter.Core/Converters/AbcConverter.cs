@@ -33,6 +33,7 @@ internal sealed class AbcParser
         public Voice(PartBuilder builder) => Builder = builder;
         public PartBuilder Builder { get; }
         public Dictionary<(char, int), int> Accidentals { get; } = new();
+        public bool EndingOpen { get; set; }
     }
 
     private readonly string[] _lines;
@@ -102,6 +103,7 @@ internal sealed class AbcParser
         foreach (var voice in _voiceOrder)
         {
             voice.Builder.Flush();
+            if (voice.EndingOpen) voice.Builder.MarkEndingStop();
             if (voice.Builder.MeasureCount > 0) _score.Parts.Add(voice.Builder.Part);
         }
         return _score;
@@ -480,10 +482,58 @@ internal sealed class AbcParser
 
     private void ParseBar(string line, ref int i)
     {
+        var begin = i;
+        if (line[i] == '[') i++;
+        var runStart = i;
         while (i < line.Length && (line[i] is '|' or ':' or ']')) i++;
+        var run = line[runStart..i];
         Bar();
-        // Volta/ending numbers such as |1 or |2 are positional markers only.
-        if (i < line.Length && char.IsDigit(line[i]) && i > 0 && line[i - 1] == '|') i++;
+
+        var voice = CurrentVoice();
+        var endsRepeat = run.StartsWith(':');
+        var startsRepeat = run.EndsWith(':') && run.Length > 0;
+        if (endsRepeat) voice.Builder.MarkRepeatEnd();
+
+        // Volta numbers follow the bar: |1  :|2  |[1  [1,2
+        var ending = ParseEndingNumbers(line, ref i, runStart > begin || run.Length > 0);
+        var closesEnding = voice.EndingOpen && (endsRepeat || ending != null || run.Contains(']'));
+        if (closesEnding)
+        {
+            voice.Builder.MarkEndingStop();
+            voice.EndingOpen = false;
+        }
+
+        if (startsRepeat) voice.Builder.MarkRepeatStart();
+        if (ending != null)
+        {
+            voice.Builder.MarkEndingStart(ending);
+            voice.EndingOpen = true;
+        }
+    }
+
+    /// <summary>Reads volta numbers such as "1", "1,2" or "1-3" and returns them as "1, 2, 3"; null when none follow.</summary>
+    private static string? ParseEndingNumbers(string line, ref int i, bool afterBar)
+    {
+        var p = i;
+        if (p < line.Length && line[p] == '[' && p + 1 < line.Length && char.IsDigit(line[p + 1])) p++;
+        else if (!(afterBar && p < line.Length && char.IsDigit(line[p]))) return null;
+
+        var numbers = new List<int>();
+        while (p < line.Length && char.IsDigit(line[p]))
+        {
+            var number = ReadInt(line, ref p);
+            if (p + 1 < line.Length && line[p] == '-' && char.IsDigit(line[p + 1]))
+            {
+                p++;
+                var to = ReadInt(line, ref p);
+                for (var n = number; n <= Math.Min(to, number + 20); n++) numbers.Add(n);
+            }
+            else numbers.Add(number);
+            if (p + 1 < line.Length && line[p] == ',' && char.IsDigit(line[p + 1])) p++;
+            else break;
+        }
+        i = p;
+        return string.Join(", ", numbers.Distinct());
     }
 
     private void ParseBracket(string line, ref int i)
@@ -500,7 +550,13 @@ internal sealed class AbcParser
             return;
         }
 
-        if (i + 1 < line.Length && (char.IsDigit(line[i + 1]) || line[i + 1] == '"'))
+        if (i + 1 < line.Length && char.IsDigit(line[i + 1]))
+        {
+            ParseBar(line, ref i);
+            return;
+        }
+
+        if (i + 1 < line.Length && line[i + 1] == '"')
         {
             i += 2;
             return;

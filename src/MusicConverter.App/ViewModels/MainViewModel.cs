@@ -280,7 +280,7 @@ public sealed class MainViewModel : ViewModelBase
 
         ProgressMessage = result.Items.Count == 0
             ? "No supported files found"
-            : $"{result.Succeeded} converted, {result.Failed} failed, {result.Skipped} skipped";
+            : $"{result.Succeeded} converted ({result.WithWarnings.Count} with warnings), {result.Failed} failed, {result.Skipped} skipped";
         StatusText = ProgressMessage;
         Status = result.Failed > 0 ? ConversionStatus.Failed : ConversionStatus.Succeeded;
     }

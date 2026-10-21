@@ -47,6 +47,17 @@ public class AbcConverterTests
     }
 
     [Fact]
+    public async Task RepeatsAndVoltaEndings()
+    {
+        var doc = await ConvertText("M:4/4\nL:1/4\nK:C\n|: CDEF :|\n|: CDEF |1 GGGG :|2 AAAA |]\n");
+        var m = doc.Parts[0].Measures;
+        Assert.True(m[0].RepeatStart && m[0].RepeatEnd);
+        Assert.True(m[1].RepeatStart);
+        Assert.True(m[2].EndingStart && m[2].RepeatEnd);
+        Assert.True(m[3].EndingStart);
+    }
+
+    [Fact]
     public async Task AppliesKeySignatureAndMeasureAccidentals()
     {
         var doc = await ConvertText("M:4/4\nL:1/4\nK:D\nF C =F ^G|^F F _B B|\n");

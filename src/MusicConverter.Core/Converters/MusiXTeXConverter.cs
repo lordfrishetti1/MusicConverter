@@ -168,6 +168,8 @@ internal sealed class MusiXTeXParser
             {
                 staff.Builder.Flush();
                 staff.Accidentals.Clear();
+                if (name is "rightrepeat" or "leftrightrepeat") staff.Builder.MarkRepeatEnd();
+                if (name is "leftrepeat" or "leftrightrepeat") staff.Builder.MarkRepeatStart();
             }
             return i;
         }

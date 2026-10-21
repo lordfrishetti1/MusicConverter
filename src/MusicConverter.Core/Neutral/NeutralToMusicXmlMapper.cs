@@ -29,7 +29,13 @@ public sealed class NeutralToMusicXmlMapper
                 var target = new MusicXmlMeasure
                 {
                     Number = measure.Number,
-                    Attributes = MapAttributes(measure, isFirst: part.Measures.Count == 0)
+                    Attributes = MapAttributes(measure, isFirst: part.Measures.Count == 0),
+                    RepeatStart = measure.RepeatStart,
+                    RepeatEnd = measure.RepeatEnd,
+                    RepeatTimes = measure.RepeatTimes,
+                    EndingNumbers = measure.EndingNumbers,
+                    EndingStart = measure.EndingStart,
+                    EndingStop = measure.EndingStop
                 };
 
                 var backup = 0;
@@ -49,6 +55,7 @@ public sealed class NeutralToMusicXmlMapper
                     if (backup > 0 && target.Notes.Count > firstIndex) target.Notes[firstIndex].BackupBefore = backup;
                     backup = length;
                 }
+                MarkTuplets(target);
                 part.Measures.Add(target);
                 progress?.Invoke(++done / (double)total, $"Mapped measure {measure.Number} of {part.Name}");
             }
@@ -58,6 +65,53 @@ public sealed class NeutralToMusicXmlMapper
 
         return document;
     }
+
+    /// <summary>
+    /// Sets tuplet start/stop per voice. A group ends when the ratio changes, a non-tuplet note follows, or its
+    /// sounding length equals <c>normal</c> notes of a plain note value (e.g. 480 = 2 eighths for 3:2).
+    /// </summary>
+    private static void MarkTuplets(MusicXmlMeasure measure)
+    {
+        foreach (var voice in measure.Notes.Where(n => !n.IsGrace && !n.IsChord).GroupBy(n => n.Voice))
+        {
+            MusicXmlNote? first = null, last = null;
+            var duration = 0;
+            var count = 0;
+
+            void Close()
+            {
+                if (first != null && last != null && first != last)
+                {
+                    first.TupletStart = true;
+                    last.TupletStop = true;
+                }
+                first = last = null;
+                duration = count = 0;
+            }
+
+            foreach (var note in voice)
+            {
+                if (note.TupletActual is not int actual || note.TupletNormal is not int normal || normal <= 0)
+                {
+                    Close();
+                    continue;
+                }
+
+                if (first != null && (first.TupletActual != actual || first.TupletNormal != normal)) Close();
+                first ??= note;
+                last = note;
+                duration += note.Duration;
+                count++;
+
+                var unit = duration % normal == 0 ? duration / normal : 0;
+                if (count >= actual || IsPlainNoteValue(unit)) Close();
+            }
+            Close();
+        }
+    }
+
+    private static bool IsPlainNoteValue(int ticks) =>
+        ticks > 0 && DurationHelper.WholeTicks % ticks == 0 && DurationHelper.IsValidNoteValue(DurationHelper.WholeTicks / ticks);
 
     private static MusicXmlAttributes? MapAttributes(NeutralMeasure measure, bool isFirst)
     {
@@ -71,7 +125,7 @@ public sealed class NeutralToMusicXmlMapper
                 Beats = a?.Beats ?? 4,
                 BeatType = a?.BeatType ?? 4,
                 ClefSign = a?.ClefSign ?? "G",
-                ClefLine = a?.ClefLine ?? 2
+                ClefLine = a?.ClefLine ?? (a?.ClefSign == "percussion" ? null : 2)
             };
         }
 

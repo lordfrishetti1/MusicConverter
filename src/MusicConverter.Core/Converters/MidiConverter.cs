@@ -115,7 +115,7 @@ internal sealed class MidiParser
     }
 
     private sealed record MidiNote(long Start, long End, int Pitch, int Channel);
-    private sealed record MidiTrack(string? Name, List<MidiNote> Notes);
+    private sealed record MidiTrack(string? Name, List<MidiNote> Notes, Dictionary<int, int> Programs);
     private sealed record TimeSignature(long Tick, int Beats, int BeatType);
     private sealed record KeySignature(long Tick, int Fifths);
     private sealed record TempoEvent(long Tick, double BeatsPerMinute);
@@ -192,17 +192,48 @@ internal sealed class MidiParser
                      .Where(p => p.Notes.Count > 0))
         {
             _context.ThrowIfCancelled();
-            var name = string.IsNullOrWhiteSpace(partData.track.Name)
-                ? $"Track {partData.index + 1} Channel {partData.Channel + 1}"
-                : partData.track.Name!;
-            score.Parts.Add(BuildPart(name, partData.Notes, maxTick, score.Parts.Count == 0));
+            var isPercussion = partData.Channel == 9;
+            var name = !string.IsNullOrWhiteSpace(partData.track.Name) ? partData.track.Name!
+                : isPercussion ? "Percussion"
+                : partData.track.Programs.TryGetValue(partData.Channel, out var program) && program < GeneralMidiNames.Length
+                    ? GeneralMidiNames[program]
+                    : $"Track {partData.index + 1} Channel {partData.Channel + 1}";
+            score.Parts.Add(BuildPart(name, partData.Notes, maxTick, score.Parts.Count == 0, ChooseClef(partData.Notes, isPercussion)));
         }
         return score;
     }
 
+    private static (string Sign, int? Line) ChooseClef(IReadOnlyCollection<MidiNote> notes, bool isPercussion)
+    {
+        if (isPercussion) return ("percussion", null);
+        // Parts that sit mostly below middle C read better in the bass clef.
+        return notes.Average(n => n.Pitch) < 55 ? ("F", 4) : ("G", 2);
+    }
+
+    private static readonly string[] GeneralMidiNames =
+    {
+        "Acoustic Grand Piano", "Bright Acoustic Piano", "Electric Grand Piano", "Honky-tonk Piano", "Electric Piano 1", "Electric Piano 2",
+        "Harpsichord", "Clavinet", "Celesta", "Glockenspiel", "Music Box", "Vibraphone", "Marimba", "Xylophone", "Tubular Bells", "Dulcimer",
+        "Drawbar Organ", "Percussive Organ", "Rock Organ", "Church Organ", "Reed Organ", "Accordion", "Harmonica", "Tango Accordion",
+        "Acoustic Guitar (nylon)", "Acoustic Guitar (steel)", "Electric Guitar (jazz)", "Electric Guitar (clean)", "Electric Guitar (muted)",
+        "Overdriven Guitar", "Distortion Guitar", "Guitar Harmonics", "Acoustic Bass", "Electric Bass (finger)", "Electric Bass (pick)",
+        "Fretless Bass", "Slap Bass 1", "Slap Bass 2", "Synth Bass 1", "Synth Bass 2", "Violin", "Viola", "Cello", "Contrabass",
+        "Tremolo Strings", "Pizzicato Strings", "Orchestral Harp", "Timpani", "String Ensemble 1", "String Ensemble 2", "Synth Strings 1",
+        "Synth Strings 2", "Choir Aahs", "Voice Oohs", "Synth Voice", "Orchestra Hit", "Trumpet", "Trombone", "Tuba", "Muted Trumpet",
+        "French Horn", "Brass Section", "Synth Brass 1", "Synth Brass 2", "Soprano Sax", "Alto Sax", "Tenor Sax", "Baritone Sax", "Oboe",
+        "English Horn", "Bassoon", "Clarinet", "Piccolo", "Flute", "Recorder", "Pan Flute", "Blown Bottle", "Shakuhachi", "Whistle", "Ocarina",
+        "Lead 1 (square)", "Lead 2 (sawtooth)", "Lead 3 (calliope)", "Lead 4 (chiff)", "Lead 5 (charang)", "Lead 6 (voice)", "Lead 7 (fifths)",
+        "Lead 8 (bass + lead)", "Pad 1 (new age)", "Pad 2 (warm)", "Pad 3 (polysynth)", "Pad 4 (choir)", "Pad 5 (bowed)", "Pad 6 (metallic)",
+        "Pad 7 (halo)", "Pad 8 (sweep)", "FX 1 (rain)", "FX 2 (soundtrack)", "FX 3 (crystal)", "FX 4 (atmosphere)", "FX 5 (brightness)",
+        "FX 6 (goblins)", "FX 7 (echoes)", "FX 8 (sci-fi)", "Sitar", "Banjo", "Shamisen", "Koto", "Kalimba", "Bagpipe", "Fiddle", "Shanai",
+        "Tinkle Bell", "Agogo", "Steel Drums", "Woodblock", "Taiko Drum", "Melodic Tom", "Synth Drum", "Reverse Cymbal", "Guitar Fret Noise",
+        "Breath Noise", "Seashore", "Bird Tweet", "Telephone Ring", "Helicopter", "Applause", "Gunshot"
+    };
+
     private MidiTrack ReadTrack(int end, int trackIndex)
     {
         var notes = new List<MidiNote>();
+        var programs = new Dictionary<int, int>();
         var active = new Dictionary<(int Channel, int Pitch), Stack<long>>();
         string? name = null;
         byte runningStatus = 0;
@@ -280,7 +311,11 @@ internal sealed class MidiParser
             var data2 = command is 0xC0 or 0xD0 ? (byte)0 : ReadByte(end);
             if (data1 >= 0x80 || data2 >= 0x80) throw _context.ParseError($"Invalid MIDI channel event in track {trackIndex + 1}.");
 
-            if (command == 0x90 && data2 > 0)
+            if (command == 0xC0)
+            {
+                programs.TryAdd(channel, data1);
+            }
+            else if (command == 0x90 && data2 > 0)
             {
                 var key = (channel, (int)data1);
                 if (!active.TryGetValue(key, out var starts)) active[key] = starts = new Stack<long>();
@@ -301,10 +336,11 @@ internal sealed class MidiParser
 
         foreach (var pending in active.Values.Where(s => s.Count > 0))
             _context.Warn("MIDI note-on events without a matching note-off were ignored.");
-        return new MidiTrack(name, notes);
+        return new MidiTrack(name, notes, programs);
     }
 
-    private NeutralPart BuildPart(string name, IReadOnlyCollection<MidiNote> notes, long maxTick, bool includeTempoEvents)
+    private NeutralPart BuildPart(
+        string name, IReadOnlyCollection<MidiNote> notes, long maxTick, bool includeTempoEvents, (string Sign, int? Line) clef)
     {
         var part = new NeutralPart { Name = name };
         // The extra beat of margin leaves room for notes that snap past the raw end; empty trailing bars are trimmed below.
@@ -354,7 +390,9 @@ internal sealed class MidiParser
                 {
                     Beats = measureInfo.TimeChanged || measureIndex == 0 ? measureInfo.Beats : null,
                     BeatType = measureInfo.TimeChanged || measureIndex == 0 ? measureInfo.BeatType : null,
-                    Fifths = measureInfo.KeyChanged || measureIndex == 0 ? measureInfo.Fifths : null
+                    Fifths = measureInfo.KeyChanged || measureIndex == 0 ? measureInfo.Fifths : null,
+                    ClefSign = measureIndex == 0 ? clef.Sign : null,
+                    ClefLine = measureIndex == 0 ? clef.Line : null
                 };
             }
 
