@@ -47,6 +47,7 @@
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
@@ -83,7 +84,24 @@
             <Button Grid.Column="2" Content="Browse…" Command="{Binding BrowseOutputCommand}" />
         </Grid>
 
-        <DockPanel Grid.Row="3" Margin="0,0,0,12">
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,0,0,8"
+                    Visibility="{Binding IsBatchMode, Converter={StaticResource BoolToVis}}">
+            <TextBlock Text="File types" Width="90" VerticalAlignment="Center" />
+            <CheckBox Content="All" IsThreeState="True" IsChecked="{Binding AllExtensionsSelected}"
+                      VerticalAlignment="Center" Margin="0,0,12,0" FontWeight="SemiBold" />
+            <ItemsControl ItemsSource="{Binding ExtensionFilters}">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <CheckBox Content="{Binding Extension}" IsChecked="{Binding IsSelected}" Margin="0,0,12,0" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </StackPanel>
+
+        <DockPanel Grid.Row="4" Margin="0,0,0,12">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
                 <Button Content="Convert" Command="{Binding ConvertCommand}" IsDefault="True" />
                 <Button Content="Cancel" Command="{Binding CancelCommand}" />
@@ -95,7 +113,7 @@
                       Width="80" Margin="6,0,0,0" HorizontalAlignment="Left" />
         </DockPanel>
 
-        <GroupBox Grid.Row="4" Header="Progress" Padding="8" Margin="0,0,0,8">
+        <GroupBox Grid.Row="5" Header="Progress" Padding="8" Margin="0,0,0,8">
             <StackPanel>
                 <Grid Margin="0,0,0,6">
                     <Grid.ColumnDefinitions>
@@ -127,7 +145,7 @@
             </StackPanel>
         </GroupBox>
 
-        <Border Grid.Row="5" Background="#FFFDE7E7" BorderBrush="Firebrick" BorderThickness="1" Padding="8" Margin="0,0,0,8">
+        <Border Grid.Row="6" Background="#FFFDE7E7" BorderBrush="Firebrick" BorderThickness="1" Padding="8" Margin="0,0,0,8">
             <Border.Style>
                 <Style TargetType="Border">
                     <Setter Property="Visibility" Value="Collapsed" />
@@ -141,7 +159,7 @@
             <TextBlock Text="{Binding ErrorMessage}" TextWrapping="Wrap" Foreground="Firebrick" />
         </Border>
 
-        <GroupBox Grid.Row="6" Header="Log">
+        <GroupBox Grid.Row="7" Header="Log">
             <DockPanel>
                 <Button DockPanel.Dock="Bottom" Content="Clear log" Command="{Binding ClearLogCommand}"
                         HorizontalAlignment="Right" Margin="0,6,0,0" />

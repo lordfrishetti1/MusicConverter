@@ -23,6 +23,9 @@ public sealed record BatchOptions
     public bool Overwrite { get; init; }
     public string? MusicXmlVersion { get; init; }
     public string OutputExtension { get; init; } = ".musicxml";
+
+    /// <summary>Input extensions (e.g. ".mid") to process. Null or empty means every supported extension.</summary>
+    public IReadOnlyCollection<string>? Extensions { get; init; }
 }
 
 /// <summary>Progress for a batch: which file is running and how far along the whole batch is.</summary>
@@ -49,8 +52,21 @@ public sealed class BatchConversionService
         _logger = logger ?? NullLogger.Instance;
     }
 
-    public IReadOnlyList<string> FindConvertibleFiles(string directory, bool recursive)
+    /// <summary>Every file extension handled by a registered converter, sorted.</summary>
+    public IReadOnlyList<string> SupportedExtensions => _registry.Converters
+        .SelectMany(c => c.FileExtensions)
+        .Select(NormalizeExtension)
+        .Distinct(StringComparer.OrdinalIgnoreCase)
+        .OrderBy(e => e, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+
+    private static string NormalizeExtension(string e) => e.StartsWith('.') ? e : "." + e;
+
+    public IReadOnlyList<string> FindConvertibleFiles(string directory, bool recursive, IReadOnlyCollection<string>? extensions = null)
     {
+        var filter = extensions is { Count: > 0 }
+            ? new HashSet<string>(extensions.Select(NormalizeExtension), StringComparer.OrdinalIgnoreCase)
+            : null;
         if (!Directory.Exists(directory))
             throw new DirectoryNotFoundException($"Input directory '{directory}' does not exist.");
 
@@ -61,6 +77,7 @@ public sealed class BatchConversionService
             AttributesToSkip = FileAttributes.System
         };
         return Directory.EnumerateFiles(directory, "*", options)
+            .Where(f => filter == null || filter.Contains(Path.GetExtension(f)))
             .Where(f => _registry.FindConverter(f) != null)
             .OrderBy(f => f, StringComparer.OrdinalIgnoreCase)
             .ToList();
@@ -74,7 +91,9 @@ public sealed class BatchConversionService
         CancellationToken cancellationToken = default)
     {
         options ??= new BatchOptions();
-        var files = FindConvertibleFiles(inputDirectory, options.Recursive);
+        // Scanning a large folder tree (and sniffing file contents) must not block the caller's UI thread.
+        var files = await Task.Run(() => FindConvertibleFiles(inputDirectory, options.Recursive, options.Extensions), cancellationToken)
+            .ConfigureAwait(false);
         var root = Path.GetFullPath(inputDirectory);
         var results = new List<BatchItemResult>();
         _logger.Info($"Batch started: {files.Count} file(s) in '{inputDirectory}'.");

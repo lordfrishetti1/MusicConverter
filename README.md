@@ -11,6 +11,7 @@ WPF (MVVM) application and library that converts music notation to **MusicXML 4.
 | MEI | `.mei` | staves → parts; layers become voices; `<verse>`/`<syl>` lyrics; `<dynam>`, `<hairpin>`, `<fermata>`, `<trill>`, `<mordent>`, `<turn>`, `<slur>`, `<tempo>`, `<dir>` control events (by `@startid` or `@tstamp`), `@artic`, `@grace` and `<graceGrp>` |
 | MusiXTeX | `.tex`, `.mtx` | `.tex` accepted only if it contains MusiXTeX markup; pitch letters mapped per the chanson.tex example |
 | MUP | `.mup` | multiple voices per staff; `lyrics` statements; accidentals follow the key signature only |
+| MIDI | `.mid`, `.midi` | Standard MIDI Files (formats 0 and 1); tracks/channels become parts; note timing, chords, tempo, key signatures and time signatures are preserved; SMPTE timing and format 2 are not supported |
 
 Each converter supports a core subset (notes, chords, rests, ties, tuplets, key/time/clef, multiple staves). Unsupported constructs (repeats and endings, MUP and MusiXTeX ornaments/dynamics/grace notes, …) are skipped with a logged warning.
 
@@ -22,7 +23,7 @@ tests/MusicConverter.Tests  xunit tests
 samples/                  one sample per format
 ```
 
-Pipeline: `IMusicFormatConverter` (text → neutral model → `MusicXmlDocument`) → `MusicXmlSerializer` (versioned writer) → file.
+Pipeline: `IMusicFormatConverter` (notation or MIDI → neutral model → `MusicXmlDocument`) → `MusicXmlSerializer` (versioned writer) → file.
 Progress is reported through `IProgress<ConversionProgress>` (Parsing → Converting → Serializing → Completed); every API takes a `CancellationToken`.
 Failures are `ConversionException` with a category (`ParseError`, `MappingError`, `SerializationError`, `UnsupportedFormat`), file path and converter name, and are logged with the stack trace.
 

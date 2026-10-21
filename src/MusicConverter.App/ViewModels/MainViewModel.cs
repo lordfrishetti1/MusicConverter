@@ -18,6 +18,29 @@ public enum ConversionStatus
     Cancelled
 }
 
+public sealed class ExtensionFilter : ViewModelBase
+{
+    private readonly Action _changed;
+    private bool _isSelected = true;
+
+    public ExtensionFilter(string extension, Action changed)
+    {
+        Extension = extension;
+        _changed = changed;
+    }
+
+    public string Extension { get; }
+
+    public bool IsSelected
+    {
+        get => _isSelected;
+        set
+        {
+            if (Set(ref _isSelected, value)) _changed();
+        }
+    }
+}
+
 public sealed class MainViewModel : ViewModelBase
 {
     private readonly ConversionService _service;
@@ -53,11 +76,14 @@ public sealed class MainViewModel : ViewModelBase
         LogEntries = uiLogger.Entries;
         AvailableVersions = serializer.SupportedVersions.ToArray();
         _selectedVersion = serializer.DefaultVersion;
+        foreach (var ext in batchService.SupportedExtensions)
+            ExtensionFilters.Add(new ExtensionFilter(ext, OnFiltersChanged));
 
         BrowseInputCommand = new RelayCommand(BrowseInput, () => !IsBusy);
         BrowseOutputCommand = new RelayCommand(BrowseOutput, () => !IsBusy);
         ClearLogCommand = new RelayCommand(LogEntries.Clear);
-        _convertCommand = new AsyncRelayCommand(ConvertAsync, () => !IsBusy && InputPath.Length > 0 && (IsBatchMode || OutputPath.Length > 0));
+        _convertCommand = new AsyncRelayCommand(ConvertAsync, () => !IsBusy && InputPath.Length > 0
+            && (IsBatchMode ? ExtensionFilters.Any(f => f.IsSelected) : OutputPath.Length > 0));
         _cancelCommand = new RelayCommand(() => _cts?.Cancel(), () => IsBusy);
     }
 
@@ -78,6 +104,35 @@ public sealed class MainViewModel : ViewModelBase
     }
 
     public bool Recursive { get => _recursive; set => Set(ref _recursive, value); }
+
+    public ObservableCollection<ExtensionFilter> ExtensionFilters { get; } = new();
+
+    /// <summary>True when every extension is selected; setting it selects or clears them all.</summary>
+    public bool? AllExtensionsSelected
+    {
+        get
+        {
+            var selected = ExtensionFilters.Count(f => f.IsSelected);
+            return selected == 0 ? false : selected == ExtensionFilters.Count ? true : null;
+        }
+        set
+        {
+            var select = value ?? false;
+            _updatingFilters = true;
+            foreach (var f in ExtensionFilters) f.IsSelected = select;
+            _updatingFilters = false;
+            OnFiltersChanged();
+        }
+    }
+
+    private bool _updatingFilters;
+
+    private void OnFiltersChanged()
+    {
+        if (_updatingFilters) return;
+        Raise(nameof(AllExtensionsSelected));
+        RefreshCommands();
+    }
     public bool Overwrite { get => _overwrite; set => Set(ref _overwrite, value); }
     public string InputLabel => IsBatchMode ? "Input folder" : "Input file";
     public string OutputLabel => IsBatchMode ? "Output folder" : "Output file";
@@ -202,7 +257,8 @@ public sealed class MainViewModel : ViewModelBase
             Recursive = Recursive,
             Overwrite = Overwrite,
             MusicXmlVersion = SelectedVersion,
-            OutputDirectory = string.IsNullOrWhiteSpace(OutputPath) ? null : OutputPath
+            OutputDirectory = string.IsNullOrWhiteSpace(OutputPath) ? null : OutputPath,
+            Extensions = ExtensionFilters.Where(f => f.IsSelected).Select(f => f.Extension).ToArray()
         };
         var batchProgress = new Progress<BatchProgress>(b =>
         {

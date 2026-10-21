@@ -51,6 +51,23 @@ public class BatchConversionTests
     }
 
     [Fact]
+    public async Task ExtensionFilter_ProcessesOnlySelectedExtensions()
+    {
+        using var dir = new TempDir();
+        var input = dir.Path + "\\in";
+        CopySamples(input, "twinkle.abc", "twinkle.ly", "twinkle.mei");
+        var service = Create();
+
+        var some = await service.ConvertDirectoryAsync(input, new BatchOptions { Extensions = new[] { ".abc", "MEI" } });
+        Assert.Equal(2, some.Items.Count);
+        Assert.All(some.Items, i => Assert.DoesNotContain(".ly", i.InputPath));
+
+        var all = await service.ConvertDirectoryAsync(input, new BatchOptions { Overwrite = true });
+        Assert.Equal(3, all.Items.Count);
+        Assert.Contains(".abc", service.SupportedExtensions);
+    }
+
+    [Fact]
     public async Task NonRecursive_IgnoresSubfolders()
     {
         using var dir = new TempDir();
