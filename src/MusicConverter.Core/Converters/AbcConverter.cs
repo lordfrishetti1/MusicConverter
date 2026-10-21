@@ -1,3 +1,4 @@
+using MusicConverter.Abstractions;
 using System.Text.RegularExpressions;
 using MusicConverter.Logging;
 using MusicConverter.MusicXml;
@@ -92,7 +93,8 @@ internal sealed class AbcParser
 
             if (FieldLine.IsMatch(line))
             {
-                HandleField(line[0], line[2..].Trim());
+                try { HandleField(line[0], line[2..].Trim()); }
+                catch (Exception ex) when (_ctx.Recover(ex)) { }
                 continue;
             }
 
@@ -354,6 +356,23 @@ internal sealed class AbcParser
         while (i < line.Length)
         {
             _ctx.ThrowIfCancelled();
+            var start = i;
+            try
+            {
+                ParseMusicToken(line, ref i);
+            }
+            catch (Exception ex) when (_ctx.Recover(ex))
+            {
+                i = Math.Max(i, start + 1);
+                while (i < line.Length && line[i] is not (' ' or '\t' or '|')) i++;
+                _inGrace = false;
+            }
+        }
+    }
+
+    private void ParseMusicToken(string line, ref int i)
+    {
+        {
             var c = line[i];
             switch (c)
             {

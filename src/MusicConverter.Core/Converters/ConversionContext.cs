@@ -27,7 +27,26 @@ public sealed class ConversionContext
     public CancellationToken CancellationToken { get; }
     public List<string> Warnings { get; } = new();
 
+    /// <summary>When true, parsers skip malformed constructs (with a warning) instead of failing the file.</summary>
+    public bool Lenient { get; init; } = true;
+
+    private const int MaxRecoveries = 500;
+    private int _recoveries;
+
     public void ThrowIfCancelled() => CancellationToken.ThrowIfCancellationRequested();
+
+    /// <summary>
+    /// Handles a recoverable parse error: in lenient mode logs it as a warning and returns true so the caller can
+    /// resynchronise; otherwise (or once too many errors piled up) returns false and the caller should rethrow.
+    /// </summary>
+    public bool Recover(Exception error)
+    {
+        if (!Lenient || error is OperationCanceledException) return false;
+        if (error is ConversionException { Category: not ConversionErrorCategory.ParseError }) return false;
+        if (++_recoveries > MaxRecoveries) return false;
+        Warn($"Skipped malformed input: {error.Message}");
+        return true;
+    }
 
     /// <summary>Records and logs a warning about an unsupported construct (once per distinct message).</summary>
     public void Warn(string message)

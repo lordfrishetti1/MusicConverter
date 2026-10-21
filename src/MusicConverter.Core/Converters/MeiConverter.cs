@@ -1,3 +1,4 @@
+using MusicConverter.Abstractions;
 using System.Text.RegularExpressions;
 using System.Xml;
 using System.Xml.Linq;
@@ -63,7 +64,16 @@ internal sealed class MeiParser
         }
         catch (XmlException ex)
         {
-            throw _ctx.ParseError($"Invalid XML: {ex.Message}", ex.LineNumber > 0 ? ex.LineNumber : null);
+            if (!_ctx.Lenient) throw _ctx.ParseError($"Invalid XML: {ex.Message}", ex.LineNumber > 0 ? ex.LineNumber : null);
+            try
+            {
+                doc = XDocument.Parse(RepairXml(_text), LoadOptions.SetLineInfo);
+                _ctx.Warn($"The XML was malformed ({ex.Message}) and was repaired; some content may be missing.");
+            }
+            catch (XmlException)
+            {
+                throw _ctx.ParseError($"Invalid XML: {ex.Message}", ex.LineNumber > 0 ? ex.LineNumber : null);
+            }
         }
 
         var root = doc.Root;
@@ -86,6 +96,50 @@ internal sealed class MeiParser
         return _score;
     }
 
+    private static readonly System.Text.RegularExpressions.Regex XmlToken = new(
+        @"<!--.*?-->|<!\[CDATA\[.*?\]\]>|<\?.*?\?>|<!DOCTYPE[^>]*>|<(?<close>/)?(?<name>[A-Za-z_][\w:.\-]*)(?<rest>[^<>]*?)(?<self>/)?>",
+        System.Text.RegularExpressions.RegexOptions.Singleline);
+
+    /// <summary>Best-effort fix for damaged XML: drops illegal characters, escapes stray '&amp;', discards a truncated final tag and balances tags.</summary>
+    private static string RepairXml(string text)
+    {
+        var cleaned = new System.Text.StringBuilder(text.Length);
+        foreach (var ch in text)
+            if (ch is '\t' or '\n' or '\r' || (ch >= ' ' && ch != '\uFFFE' && ch != '\uFFFF')) cleaned.Append(ch);
+        text = System.Text.RegularExpressions.Regex.Replace(
+            cleaned.ToString(), @"&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9a-fA-F]+);)", "&amp;");
+
+        var output = new System.Text.StringBuilder(text.Length + 64);
+        var open = new Stack<string>();
+        var position = 0;
+        foreach (System.Text.RegularExpressions.Match m in XmlToken.Matches(text))
+        {
+            output.Append(text, position, m.Index - position);
+            position = m.Index + m.Length;
+            if (!m.Groups["name"].Success) { output.Append(m.Value); continue; }
+
+            var name = m.Groups["name"].Value;
+            if (m.Groups["close"].Success)
+            {
+                if (!open.Contains(name)) continue;
+                while (open.Peek() != name) output.Append("</").Append(open.Pop()).Append('>');
+                open.Pop();
+                output.Append(m.Value);
+            }
+            else
+            {
+                if (!m.Groups["self"].Success) open.Push(name);
+                output.Append(m.Value);
+            }
+        }
+
+        var tail = text[position..];
+        var cut = tail.IndexOf('<');
+        output.Append(cut < 0 ? tail : tail[..cut]);
+        while (open.Count > 0) output.Append("</").Append(open.Pop()).Append('>');
+        return output.ToString();
+    }
+
     private void ReadHeader(XElement root)
     {
         var head = root.Elements().FirstOrDefault(e => e.Name.LocalName == "meiHead");
@@ -104,6 +158,8 @@ internal sealed class MeiParser
         foreach (var child in container.Elements())
         {
             _ctx.ThrowIfCancelled();
+            try
+            {
             switch (child.Name.LocalName)
             {
                 case "scoreDef":
@@ -126,6 +182,8 @@ internal sealed class MeiParser
                     _ctx.Warn("Alternative readings (<rdg>) were ignored");
                     break;
             }
+            }
+            catch (Exception ex) when (_ctx.Recover(ex)) { }
         }
     }
 
@@ -521,6 +579,8 @@ internal sealed class MeiParser
         foreach (var element in container.Elements())
         {
             _ctx.ThrowIfCancelled();
+            try
+            {
             switch (element.Name.LocalName)
             {
                 case "note":
@@ -576,6 +636,8 @@ internal sealed class MeiParser
                     _ctx.Warn($"MEI element <{element.Name.LocalName}> is not supported and was ignored");
                     break;
             }
+            }
+            catch (Exception ex) when (_ctx.Recover(ex)) { }
         }
     }
 

@@ -1,3 +1,4 @@
+using MusicConverter.Abstractions;
 using System.Text.RegularExpressions;
 using MusicConverter.Logging;
 using MusicConverter.MusicXml;
@@ -82,10 +83,14 @@ internal sealed class HumdrumParser
             if (line.StartsWith('!')) continue;
 
             var tokens = line.Split('\t');
-            if (tokens[0].StartsWith("**")) StartSpines(tokens);
-            else if (_tracks.Count == 0) throw _ctx.ParseError("Data found before any '**' exclusive interpretation line", _lineNo);
-            else if (tokens[0].StartsWith('*')) ReadInterpretations(tokens);
-            else ReadData(tokens);
+            try
+            {
+                if (tokens[0].StartsWith("**")) StartSpines(tokens);
+                else if (_tracks.Count == 0) throw _ctx.ParseError("Data found before any '**' exclusive interpretation line", _lineNo);
+                else if (tokens[0].StartsWith('*')) ReadInterpretations(tokens);
+                else ReadData(tokens);
+            }
+            catch (Exception ex) when (_ctx.Recover(ex)) { }
         }
 
         if (_builders.Count == 0)
@@ -214,21 +219,36 @@ internal sealed class HumdrumParser
     private void ReadData(string[] tokens)
     {
         if (tokens.Length != _tracks.Count)
-            throw _ctx.ParseError($"Expected {_tracks.Count} spines but found {tokens.Length}", _lineNo);
+        {
+            if (!_ctx.Lenient) throw _ctx.ParseError($"Expected {_tracks.Count} spines but found {tokens.Length}", _lineNo);
+            _ctx.Warn($"Line {_lineNo}: expected {_tracks.Count} spines but found {tokens.Length}; padded or truncated.");
+            var fixedTokens = new string[_tracks.Count];
+            for (var k = 0; k < fixedTokens.Length; k++) fixedTokens[k] = k < tokens.Length ? tokens[k] : ".";
+            tokens = fixedTokens;
+        }
 
         var lineNotes = new Dictionary<Track, NeutralNote?>();
         for (var i = 0; i < tokens.Length; i++)
         {
-            var track = _tracks[i];
-            var token = tokens[i];
+            try
+            {
+                ReadDataToken(tokens[i], _tracks[i], lineNotes);
+            }
+            catch (Exception ex) when (_ctx.Recover(ex)) { }
+        }
+    }
+
+    private void ReadDataToken(string token, Track track, Dictionary<Track, NeutralNote?> lineNotes)
+    {
+        {
             if (track.Target != null)
             {
                 var target = lineNotes.GetValueOrDefault(track.Target);
                 if (track.Kind == "**dynam") ReadDynamics(target, token);
                 else if (!token.StartsWith('=')) ReadSyllable(track, target, token);
-                continue;
+                return;
             }
-            if (track.Builder is null || token == ".") continue;
+            if (track.Builder is null || token == ".") return;
 
             if (token.StartsWith('='))
             {
@@ -239,12 +259,12 @@ internal sealed class HumdrumParser
                     if (token.Contains(":|")) track.Builder.MarkRepeatEnd();
                     if (token.Contains("|:")) track.Builder.MarkRepeatStart();
                 }
-                continue;
+                return;
             }
             if (track.Secondary)
             {
                 ReadNote(VoiceBuilder(track.Builder, track.Voice), token, track.Voice);
-                continue;
+                return;
             }
             var read = ReadNote(track.Builder, token, 1);
             if (read != null && _pendingTempo.Remove(track.Builder, out var tempo)) read.Directions.Add(tempo);

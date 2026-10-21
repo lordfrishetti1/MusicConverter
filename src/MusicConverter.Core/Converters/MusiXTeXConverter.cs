@@ -1,3 +1,4 @@
+using MusicConverter.Abstractions;
 using System.Text.RegularExpressions;
 using MusicConverter.Logging;
 using MusicConverter.Neutral;
@@ -118,7 +119,15 @@ internal sealed class MusiXTeXParser
             var ch = _text[i];
             if (ch == '\\')
             {
-                i = ReadCommand(i);
+                var commandStart = i;
+                try
+                {
+                    i = ReadCommand(i);
+                }
+                catch (Exception ex) when (_ctx.Recover(ex))
+                {
+                    i = commandStart + 1;
+                }
                 _ctx.ReportParsing(i / (double)_text.Length, "Parsing MusiXTeX");
             }
             else

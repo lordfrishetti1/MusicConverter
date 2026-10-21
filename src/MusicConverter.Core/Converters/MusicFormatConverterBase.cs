@@ -15,6 +15,9 @@ public abstract class MusicFormatConverterBase : IMusicFormatConverter
 
     protected ILogger Logger { get; }
 
+    /// <summary>When true (default) malformed constructs are skipped with a warning so damaged files can still be converted.</summary>
+    public bool Lenient { get; set; } = true;
+
     public abstract string FormatName { get; }
 
     public abstract IReadOnlyCollection<string> FileExtensions { get; }
@@ -32,7 +35,7 @@ public abstract class MusicFormatConverterBase : IMusicFormatConverter
     public async Task<MusicXmlDocument> ConvertAsync(
         string filePath, IProgress<ConversionProgress>? progress, CancellationToken cancellationToken = default)
     {
-        var context = new ConversionContext(filePath, FormatName, Logger, progress, cancellationToken);
+        var context = new ConversionContext(filePath, FormatName, Logger, progress, cancellationToken) { Lenient = Lenient };
         Logger.Info($"Conversion started: converter '{FormatName}', file '{filePath}'.");
 
         try

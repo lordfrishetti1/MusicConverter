@@ -124,7 +124,7 @@ public class AbcConverterTests
         using var dir = new TempDir();
         var path = dir.Write("bad.abc", "M:4/4\nL:1/4\nK:C\n[CE G|\n");
         var logger = new InMemoryLogger();
-        var ex = await Assert.ThrowsAsync<ConversionException>(() => new AbcConverter(logger).ConvertAsync(path, null));
+        var ex = await Assert.ThrowsAsync<ConversionException>(() => new AbcConverter(logger) { Lenient = false }.ConvertAsync(path, null));
         Assert.Equal(ConversionErrorCategory.ParseError, ex.Category);
         Assert.Equal(path, ex.FilePath);
         Assert.Equal("ABC", ex.ConverterName);

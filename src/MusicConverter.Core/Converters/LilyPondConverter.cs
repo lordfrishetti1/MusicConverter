@@ -179,6 +179,24 @@ internal sealed class LilyPondParser
             Tick();
 
             var c = Peek();
+            var topStart = _pos;
+            try
+            {
+                ParseTopLevelItem(c);
+            }
+            catch (Exception ex) when (_ctx.Recover(ex))
+            {
+                if (_pos <= topStart) { _pos = topStart; SkipToken(); if (_pos <= topStart) _pos++; }
+            }
+        }
+
+        ResolveLyrics();
+        return _score;
+    }
+
+    private void ParseTopLevelItem(char c)
+    {
+        {
             if (c == '\\')
             {
                 var save = _pos;
@@ -250,9 +268,6 @@ internal sealed class LilyPondParser
                 _pos++;
             }
         }
-
-        ResolveLyrics();
-        return _score;
     }
 
     #region Cursor helpers
@@ -529,7 +544,7 @@ internal sealed class LilyPondParser
             while (true)
             {
                 SkipWs();
-                if (Eof) throw Fail("Unterminated '<<': missing '>>'");
+                if (Eof) { if (!_ctx.Lenient) throw Fail("Unterminated '<<': missing '>>'"); _ctx.Warn("Unterminated '<<': closed automatically at end of file."); break; }
                 if (StartsWith(">>")) { _pos += 2; return; }
                 if (StartsWith("\\\\")) { _pos += 2; continue; }
                 Tick();
@@ -767,10 +782,23 @@ internal sealed class LilyPondParser
         while (true)
         {
             SkipWs();
-            if (Eof) throw _ctx.ParseError("Unbalanced braces: '{' is never closed", startLine);
+            if (Eof)
+            {
+                if (!_ctx.Lenient) throw _ctx.ParseError("Unbalanced braces: '{' is never closed", startLine);
+                _ctx.Warn($"Unbalanced braces: '{{' on line {startLine} is never closed; closed automatically at end of file.");
+                return;
+            }
             if (Peek() == '}') { _pos++; return; }
             Tick();
-            ParseItem(st);
+            var itemStart = _pos;
+            try
+            {
+                ParseItem(st);
+            }
+            catch (Exception ex) when (_ctx.Recover(ex))
+            {
+                if (_pos <= itemStart) { _pos = itemStart; SkipToken(); if (_pos <= itemStart) _pos++; }
+            }
         }
     }
 
@@ -813,7 +841,7 @@ internal sealed class LilyPondParser
             while (true)
             {
                 SkipWs();
-                if (Eof) throw Fail("Unterminated '<<': missing '>>'");
+                if (Eof) { if (!_ctx.Lenient) throw Fail("Unterminated '<<': missing '>>'"); _ctx.Warn("Unterminated '<<': closed automatically at end of file."); break; }
                 if (StartsWith(">>")) { _pos += 2; break; }
                 if (StartsWith("\\\\")) { _pos += 2; continue; }
                 Tick();
@@ -897,7 +925,7 @@ internal sealed class LilyPondParser
         while (true)
         {
             SkipWs();
-            if (Eof) throw Fail("Unterminated '<<': missing '>>'");
+            if (Eof) { if (!_ctx.Lenient) throw Fail("Unterminated '<<': missing '>>'"); _ctx.Warn("Unterminated '<<': closed automatically at end of file."); break; }
             if (StartsWith(">>")) { _pos += 2; break; }
             if (StartsWith("\\\\")) { _pos += 2; continue; }
             Tick();

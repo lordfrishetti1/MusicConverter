@@ -1,3 +1,4 @@
+using MusicConverter.Abstractions;
 using System.Text.RegularExpressions;
 using MusicConverter.Logging;
 using MusicConverter.MusicXml;
@@ -221,10 +222,13 @@ internal sealed class NwcTxtParser
 
             var line = _lines[i].Trim();
             if (line.Length == 0 || line[0] == '!') continue;
-            if (line[0] != '|') throw _ctx.ParseError($"Unexpected text '{line}'", _lineNo);
-
-            var fields = SplitFields(line);
-            HandleObject(fields.Type, fields.Values);
+            try
+            {
+                if (line[0] != '|') throw _ctx.ParseError($"Unexpected text '{line}'", _lineNo);
+                var fields = SplitFields(line);
+                HandleObject(fields.Type, fields.Values);
+            }
+            catch (Exception ex) when (_ctx.Recover(ex)) { }
         }
 
         foreach (var staff in _staves)

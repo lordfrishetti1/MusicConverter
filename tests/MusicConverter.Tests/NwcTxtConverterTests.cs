@@ -117,7 +117,7 @@ public class NwcTxtConverterTests
     {
         using var dir = new TempDir();
         var path = dir.Write("bad.nwctxt", Header + line + "\n");
-        var ex = await Assert.ThrowsAsync<ConversionException>(() => new NwcTxtConverter().ConvertAsync(path, null));
+        var ex = await Assert.ThrowsAsync<ConversionException>(() => new NwcTxtConverter { Lenient = false }.ConvertAsync(path, null));
         Assert.Equal(ConversionErrorCategory.ParseError, ex.Category);
         Assert.Equal(2, ex.Line);
     }

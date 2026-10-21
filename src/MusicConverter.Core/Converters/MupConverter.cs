@@ -1,3 +1,4 @@
+using MusicConverter.Abstractions;
 using System.Text;
 using System.Text.RegularExpressions;
 using MusicConverter.Logging;
@@ -184,7 +185,12 @@ internal sealed class MupParser
         }
 
         if (!_sawMusic) throw _ctx.ParseError("No 'music' context found; not a MUP file");
-        if (_tuplet != null) throw _ctx.ParseError("Unterminated tuplet: missing '}'");
+        if (_tuplet != null)
+        {
+            if (!_ctx.Lenient) throw _ctx.ParseError("Unterminated tuplet: missing '}'");
+            _ctx.Warn("Unterminated tuplet: missing '}'; notes kept as written.");
+            _tuplet = null;
+        }
 
         foreach (var staff in _staves)
         {
@@ -407,6 +413,9 @@ internal sealed class MupParser
 
             var line = LineAt(i);
             var c = text[i];
+            var statementStart = i;
+            try
+            {
 
             if (c == '{')
             {
@@ -472,6 +481,13 @@ internal sealed class MupParser
             if (end < 0) throw _ctx.ParseError("Missing ';' at end of chord", line);
             ReadChord(text[i..end].Trim(), line);
             i = end + 1;
+
+            }
+            catch (Exception ex) when (_ctx.Recover(ex))
+            {
+                var semi = text.IndexOf(';', statementStart);
+                i = semi < 0 ? text.Length : Math.Max(semi + 1, statementStart + 1);
+            }
         }
     }
 
@@ -531,7 +547,9 @@ internal sealed class MupParser
     private void FlushTupletWarning()
     {
         if (_tuplet == null) return;
-        throw _ctx.ParseError("A bar line appeared inside a tuplet");
+        if (!_ctx.Lenient) throw _ctx.ParseError("A bar line appeared inside a tuplet");
+        _ctx.Warn("A bar line appeared inside a tuplet; the tuplet was dropped.");
+        _tuplet = null;
     }
 
     private int CloseTuplet(string text, int index, int line)

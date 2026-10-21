@@ -151,7 +151,7 @@ public class LilyPondConverterTests
     {
         using var dir = new TempDir();
         var path = dir.Write("bad.ly", "\\relative c' {\n c4 d\n");
-        var ex = await Assert.ThrowsAsync<ConversionException>(() => new LilyPondConverter().ConvertAsync(path, null));
+        var ex = await Assert.ThrowsAsync<ConversionException>(() => new LilyPondConverter { Lenient = false }.ConvertAsync(path, null));
         Assert.Equal(ConversionErrorCategory.ParseError, ex.Category);
         Assert.Equal("LilyPond", ex.ConverterName);
         Assert.Equal(1, ex.Line);
