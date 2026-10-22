@@ -48,6 +48,7 @@ public sealed class MainViewModel : ViewModelBase
     private readonly ConverterRegistry _registry;
     private readonly IFileDialogService _dialogs;
     private readonly ILogger _logger;
+    private readonly IBatchNotifier? _notifier;
     private readonly AsyncRelayCommand _convertCommand;
     private readonly RelayCommand _cancelCommand;
     private CancellationTokenSource? _cts;
@@ -69,8 +70,9 @@ public sealed class MainViewModel : ViewModelBase
 
     public MainViewModel(
         ConversionService service, BatchConversionService batchService, ConverterRegistry registry, MusicXmlSerializer serializer,
-        IFileDialogService dialogs, UiLogger uiLogger, ILogger logger)
+        IFileDialogService dialogs, UiLogger uiLogger, ILogger logger, IBatchNotifier? notifier = null)
     {
+        _notifier = notifier;
         _service = service;
         _batchService = batchService;
         _registry = registry;
@@ -307,6 +309,7 @@ public sealed class MainViewModel : ViewModelBase
               $", {result.Skipped} skipped";
         StatusText = ProgressMessage;
         Status = result.Failed > 0 ? ConversionStatus.Failed : ConversionStatus.Succeeded;
+        _notifier?.BatchCompleted(ProgressMessage, result.Failed > 0);
     }
 
     private async Task ConvertAsync()

@@ -12,6 +12,9 @@ public partial class SettingsWindow : Window
     public SettingsWindow(ConversionSettings target, Action<ConversionSettings> persist)
     {
         InitializeComponent();
+        var levels = Enum.GetValues<MusicConverter.Logging.LogLevel>();
+        FileLevelBox.ItemsSource = levels;
+        UiLevelBox.ItemsSource = levels;
         _target = target;
         _persist = persist;
         _edit = target.Clone();

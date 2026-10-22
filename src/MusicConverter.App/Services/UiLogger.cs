@@ -15,7 +15,7 @@ public sealed class UiLogger : ILogger
 
     private readonly ConcurrentQueue<string> _pending = new();
     private readonly DispatcherTimer _timer;
-    private readonly LogLevel _minimumLevel;
+    private volatile LogLevel _minimumLevel;
     private readonly int _maxEntries;
 
     public UiLogger(int maxEntries = 2000, LogLevel minimumLevel = LogLevel.Information)
@@ -31,6 +31,12 @@ public sealed class UiLogger : ILogger
     }
 
     public ObservableCollection<string> Entries { get; } = new();
+
+    public LogLevel MinimumLevel
+    {
+        get => _minimumLevel;
+        set => _minimumLevel = value;
+    }
 
     public void Log(LogLevel level, string message, Exception? exception = null)
     {

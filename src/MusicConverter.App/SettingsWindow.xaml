@@ -70,6 +70,31 @@
             </StackPanel>
         </GroupBox>
 
+        <GroupBox Header="Notifications and logging" Padding="10" Margin="0,0,0,10">
+            <StackPanel>
+                <CheckBox Content="Show a notification when a batch completes" IsChecked="{Binding NotifyOnBatchComplete}" />
+                <CheckBox Content="Play a sound when a batch completes" IsChecked="{Binding PlaySoundOnBatchComplete}" Margin="0,6,0,12" />
+
+                <TextBlock Text="Log folder" FontWeight="SemiBold" />
+                <TextBox Text="{Binding LogDirectory, UpdateSourceTrigger=PropertyChanged}" Width="Auto" HorizontalAlignment="Stretch" />
+                <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,12"
+                           Text="Leave empty for %LOCALAPPDATA%\MusicConverter\logs." />
+
+                <CheckBox Content="Write a log file" IsChecked="{Binding FileLoggingEnabled}" Margin="0,0,0,8" />
+
+                <TextBlock Text="Log file level" FontWeight="SemiBold" />
+                <ComboBox x:Name="FileLevelBox" SelectedItem="{Binding FileLogLevel}" Width="140" HorizontalAlignment="Left" Margin="0,0,0,8" />
+
+                <TextBlock Text="Log panel level" FontWeight="SemiBold" />
+                <ComboBox x:Name="UiLevelBox" SelectedItem="{Binding UiLogLevel}" Width="140" HorizontalAlignment="Left" Margin="0,0,0,8" />
+
+                <TextBlock Text="Delete log files older than (days)" FontWeight="SemiBold" />
+                <TextBox Text="{Binding LogRetentionDays, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,0"
+                           Text="0 keeps all (0–3650). The folder, file options and retention take effect the next time the app starts; the panel level applies immediately." />
+            </StackPanel>
+        </GroupBox>
+
         <GroupBox Header="Error handling" Padding="10" Margin="0,0,0,10">
             <StackPanel>
                 <CheckBox Content="Lenient mode: skip malformed input with a warning" IsChecked="{Binding Lenient}" />

@@ -46,6 +46,27 @@ public sealed class ConversionSettings
     /// <summary>Re-reads each written file and compares it with the converted model (and, for MIDI, the source note count).</summary>
     public bool VerifyOutput { get; set; }
 
+    /// <summary>Folder for log files. Empty uses %LOCALAPPDATA%\MusicConverter\logs. Applied at next start.</summary>
+    public string LogDirectory { get; set; } = "";
+
+    /// <summary>Writes a log file. Applied at next start.</summary>
+    public bool FileLoggingEnabled { get; set; } = true;
+
+    /// <summary>Lowest level written to the log file. Applied at next start.</summary>
+    public Logging.LogLevel FileLogLevel { get; set; } = Logging.LogLevel.Debug;
+
+    /// <summary>Lowest level shown in the log panel. Applied at next start.</summary>
+    public Logging.LogLevel UiLogLevel { get; set; } = Logging.LogLevel.Information;
+
+    /// <summary>Log files older than this many days are deleted at start. 0 keeps them all.</summary>
+    public int LogRetentionDays { get; set; } = 30;
+
+    /// <summary>Shows a toast notification when a batch finishes.</summary>
+    public bool NotifyOnBatchComplete { get; set; } = true;
+
+    /// <summary>Plays a sound when a batch finishes.</summary>
+    public bool PlaySoundOnBatchComplete { get; set; } = true;
+
     [JsonIgnore]
     public long MaxInputBytes => MaxInputMegabytes * 1024L * 1024L;
 
@@ -69,6 +90,13 @@ public sealed class ConversionSettings
         PauseWhenMemoryAbovePercent = other.PauseWhenMemoryAbovePercent;
         IsolateProcesses = other.IsolateProcesses;
         VerifyOutput = other.VerifyOutput;
+        LogDirectory = other.LogDirectory;
+        FileLoggingEnabled = other.FileLoggingEnabled;
+        FileLogLevel = other.FileLogLevel;
+        UiLogLevel = other.UiLogLevel;
+        LogRetentionDays = other.LogRetentionDays;
+        NotifyOnBatchComplete = other.NotifyOnBatchComplete;
+        PlaySoundOnBatchComplete = other.PlaySoundOnBatchComplete;
         Clamp();
     }
 
@@ -84,6 +112,10 @@ public sealed class ConversionSettings
         MaxRecoveries = Math.Clamp(MaxRecoveries, 0, 100_000);
         MaxWarnings = Math.Clamp(MaxWarnings, 1, 100_000);
         PerFileTimeoutSeconds = Math.Clamp(PerFileTimeoutSeconds, 0, 86_400);
+        LogDirectory = (LogDirectory ?? "").Trim();
+        LogRetentionDays = Math.Clamp(LogRetentionDays, 0, 3650);
+        if (!Enum.IsDefined(FileLogLevel)) FileLogLevel = Logging.LogLevel.Debug;
+        if (!Enum.IsDefined(UiLogLevel)) UiLogLevel = Logging.LogLevel.Information;
     }
 }
 

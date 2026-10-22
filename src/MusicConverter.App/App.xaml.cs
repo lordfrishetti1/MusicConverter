@@ -34,6 +34,21 @@ public partial class App : Application
         return exitCode;
     }
 
+    private static void PruneLogs(string directory, int retentionDays, ILogger logger)
+    {
+        if (retentionDays <= 0) return;
+        var cutoff = DateTime.Now.AddDays(-retentionDays);
+        try
+        {
+            foreach (var file in Directory.EnumerateFiles(directory, "musicconverter-*.log"))
+                if (File.GetLastWriteTime(file) < cutoff) File.Delete(file);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            logger.Warning($"Old log files could not be removed: {ex.Message}");
+        }
+    }
+
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
@@ -44,22 +59,38 @@ public partial class App : Application
             return;
         }
 
-        var logDirectory = Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MusicConverter", "logs");
         var uiLogger = new UiLogger();
-        var logger = new CompositeLogger(
-            new DebugLogger(),
-            new FileLogger(Path.Combine(logDirectory, $"musicconverter-{DateTime.Now:yyyyMMdd}.log")),
-            uiLogger);
+        var logger = new CompositeLogger(new DebugLogger(), uiLogger);
 
         var service = CreateService(logger);
         var registry = service.Registry;
         var serializer = service.Serializer;
         var settingsStore = new SettingsStore(logger);
         service.Settings.CopyFrom(settingsStore.Load());
+        uiLogger.MinimumLevel = service.Settings.UiLogLevel;
+
+        if (service.Settings.FileLoggingEnabled)
+        {
+            // The log folder is a setting, so the file logger is attached once settings are loaded.
+            var logDirectory = string.IsNullOrWhiteSpace(service.Settings.LogDirectory)
+                ? Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MusicConverter", "logs")
+                : service.Settings.LogDirectory;
+            try
+            {
+                logger.Add(new FileLogger(Path.Combine(logDirectory, $"musicconverter-{DateTime.Now:yyyyMMdd}.log"),
+                    service.Settings.FileLogLevel));
+                PruneLogs(logDirectory, service.Settings.LogRetentionDays, logger);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+            {
+                logger.Warning($"Log folder '{logDirectory}' is unusable; file logging is disabled: {ex.Message}");
+            }
+        }
+        var notifier = new BatchNotifier(service.Settings);
+        Exit += (_, _) => notifier.Dispose();
         var isolatedRunner = Environment.ProcessPath is { } exe ? new ProcessConversionRunner(exe, service.Settings, logger) : null;
         var batch = new BatchConversionService(registry, service, logger, isolatedRunner);
-        var viewModel = new MainViewModel(service, batch, registry, serializer, new WpfFileDialogService(), uiLogger, logger);
+        var viewModel = new MainViewModel(service, batch, registry, serializer, new WpfFileDialogService(),         uiLogger, logger, notifier);
 
         DispatcherUnhandledException += (_, args) =>
         {
@@ -68,6 +99,6 @@ public partial class App : Application
             args.Handled = true;
         };
 
-        new MainWindow { DataContext = viewModel, Settings = service.Settings, SaveSettings = settingsStore.Save }.Show();
+        new MainWindow { DataContext = viewModel, Settings = service.Settings, SaveSettings = s => { settingsStore.Save(s); uiLogger.MinimumLevel = s.UiLogLevel; } }.Show();
     }
 }
