@@ -6,10 +6,13 @@ using MusicConverter.Neutral;
 namespace MusicConverter.Converters;
 
 /// <summary>Imports Standard MIDI Files (.mid, .midi), preserving tracks and channels as parts.</summary>
-public sealed class MidiConverter : IMusicFormatConverter
+public sealed class MidiConverter : IMusicFormatConverter, IConfigurableConverter
 {
     private static readonly string[] Extensions = { ".mid", ".midi" };
     private readonly ILogger _logger;
+    private ConversionSettings _settings = new();
+
+    public void Configure(ConversionSettings settings) => _settings = settings.Clone();
 
     public MidiConverter() : this(null) { }
 
@@ -25,13 +28,14 @@ public sealed class MidiConverter : IMusicFormatConverter
     public async Task<MusicXmlDocument> ConvertAsync(
         string filePath, IProgress<ConversionProgress>? progress, CancellationToken cancellationToken = default)
     {
-        var context = new ConversionContext(filePath, FormatName, _logger, progress, cancellationToken);
+        var context = new ConversionContext(filePath, FormatName, _logger, progress, cancellationToken) { Settings = _settings };
         _logger.Info($"Conversion started: converter '{FormatName}', file '{filePath}'.");
 
         try
         {
             cancellationToken.ThrowIfCancellationRequested();
             context.ReportParsing(0, "Reading MIDI file");
+            context.EnsureInputSize(filePath);
             byte[] data;
             try
             {

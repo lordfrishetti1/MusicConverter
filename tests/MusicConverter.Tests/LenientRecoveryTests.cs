@@ -84,6 +84,15 @@ public class LenientRecoveryTests
         await Assert.ThrowsAsync<ConversionException>(() => new LilyPondConverter { Lenient = false }.ConvertAsync(path, null));
     }
 
+    [Fact]
+    public async Task DeeplyNestedInputFailsCleanlyInsteadOfOverflowingTheStack()
+    {
+        using var dir = new TempDir();
+        var path = dir.Write("deep.ly", new string('{', 200000) + " c4 " + new string('}', 200000));
+        var ex = await Assert.ThrowsAsync<ConversionException>(() => new LilyPondConverter().ConvertAsync(path, null));
+        Assert.Equal(ConversionErrorCategory.LimitExceeded, ex.Category);
+    }
+
     [Theory]
     [InlineData("twinkle.abc")]
     public async Task TruncatedSamplesNeverThrowUnexpectedly(string sample)

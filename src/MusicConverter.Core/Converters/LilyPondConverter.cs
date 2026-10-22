@@ -659,6 +659,7 @@ internal sealed class LilyPondParser
 
     private void ParseItem(StaffState st)
     {
+        using var nesting = _ctx.EnterNesting();
         SkipWs();
         if (Eof) return;
         var c = Peek();
@@ -777,6 +778,7 @@ internal sealed class LilyPondParser
 
     private void ParseSequence(StaffState st)
     {
+        using var nesting = _ctx.EnterNesting();
         var startLine = CurrentLine();
         _pos++;
         while (true)

@@ -155,6 +155,7 @@ internal sealed class MeiParser
 
     private void Walk(XElement container)
     {
+        using var nesting = _ctx.EnterNesting();
         foreach (var child in container.Elements())
         {
             _ctx.ThrowIfCancelled();
@@ -576,6 +577,7 @@ internal sealed class MeiParser
 
     private void ReadLayerContent(Staff staff, XElement container, int? tupletActual = null, int? tupletNormal = null)
     {
+        using var nesting = _ctx.EnterNesting();
         foreach (var element in container.Elements())
         {
             _ctx.ThrowIfCancelled();

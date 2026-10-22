@@ -30,10 +30,58 @@ public sealed class ConversionContext
     /// <summary>When true, parsers skip malformed constructs (with a warning) instead of failing the file.</summary>
     public bool Lenient { get; init; } = true;
 
-    private const int MaxRecoveries = 500;
+    public ConversionSettings Settings { get; init; } = new();
+
     private int _recoveries;
+    private readonly HashSet<string> _warningSet = new();
+    private int _depth;
 
     public void ThrowIfCancelled() => CancellationToken.ThrowIfCancellationRequested();
+
+    /// <summary>Call before recursing; dispose the result when leaving. Fails with a catchable error instead of overflowing the stack.</summary>
+    public NestingScope EnterNesting()
+    {
+        if (++_depth > Settings.MaxNestingDepth)
+        {
+            _depth--;
+            throw Limit($"Input is nested more than {Settings.MaxNestingDepth} levels deep.");
+        }
+        try
+        {
+            System.Runtime.CompilerServices.RuntimeHelpers.EnsureSufficientExecutionStack();
+        }
+        catch (InsufficientExecutionStackException)
+        {
+            _depth--;
+            throw Limit("Input is nested too deeply for the available stack.");
+        }
+        return new NestingScope(this);
+    }
+
+    public readonly struct NestingScope : IDisposable
+    {
+        private readonly ConversionContext _owner;
+        internal NestingScope(ConversionContext owner) => _owner = owner;
+        public void Dispose() => _owner._depth--;
+    }
+
+    public void EnsureInputSize(string path)
+    {
+        long length;
+        try { length = new FileInfo(path).Length; }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
+        {
+            return; // the subsequent read reports the real problem
+        }
+        if (length > Settings.MaxInputBytes)
+            throw Limit($"File is too large ({length / (1024 * 1024)} MB; limit {Settings.MaxInputMegabytes} MB).");
+    }
+
+    private ConversionException Limit(string message) => new(message, ConversionErrorCategory.LimitExceeded)
+    {
+        FilePath = FilePath,
+        ConverterName = ConverterName
+    };
 
     /// <summary>
     /// Handles a recoverable parse error: in lenient mode logs it as a warning and returns true so the caller can
@@ -43,7 +91,7 @@ public sealed class ConversionContext
     {
         if (!Lenient || error is OperationCanceledException) return false;
         if (error is ConversionException { Category: not ConversionErrorCategory.ParseError }) return false;
-        if (++_recoveries > MaxRecoveries) return false;
+        if (++_recoveries > Settings.MaxRecoveries) return false;
         Warn($"Skipped malformed input: {error.Message}");
         return true;
     }
@@ -51,7 +99,13 @@ public sealed class ConversionContext
     /// <summary>Records and logs a warning about an unsupported construct (once per distinct message).</summary>
     public void Warn(string message)
     {
-        if (Warnings.Contains(message)) return;
+        if (Warnings.Count > Settings.MaxWarnings) return;
+        if (Warnings.Count == Settings.MaxWarnings)
+        {
+            Warnings.Add($"Further warnings were suppressed after {Settings.MaxWarnings}.");
+            return;
+        }
+        if (!_warningSet.Add(message)) return;
         Warnings.Add(message);
         Logger.Warning($"[{ConverterName}] {Path.GetFileName(FilePath)}: {message}");
     }

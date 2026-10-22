@@ -51,7 +51,10 @@
             <RowDefinition Height="*" />
         </Grid.RowDefinitions>
 
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,10">
+        <DockPanel Grid.Row="0" Margin="0,0,0,10">
+            <Button DockPanel.Dock="Right" Content="Settings…" VerticalAlignment="Center" Click="OnOpenSettings"
+                    IsEnabled="{Binding CanEditSettings}" />
+        <StackPanel Orientation="Horizontal">
             <Image Source="{StaticResource BassClefIcon}" Width="36" Height="36" />
             <TextBlock Text="Music Converter" FontSize="20" FontWeight="SemiBold" Margin="10,0,0,0" VerticalAlignment="Center" />
             <CheckBox Content="Batch (folder) mode" IsChecked="{Binding IsBatchMode}" Margin="24,0,0,0" VerticalAlignment="Center" />
@@ -60,6 +63,7 @@
             <CheckBox Content="Overwrite existing" IsChecked="{Binding Overwrite}" Margin="14,0,0,0" VerticalAlignment="Center"
                       Visibility="{Binding IsBatchMode, Converter={StaticResource BoolToVis}}" />
         </StackPanel>
+        </DockPanel>
 
         <Grid Grid.Row="1" Margin="0,0,0,8">
             <Grid.ColumnDefinitions>

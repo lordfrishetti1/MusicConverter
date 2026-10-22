@@ -15,6 +15,9 @@ public sealed class ConversionService
     private readonly MusicXmlSerializer _serializer;
     private readonly ILogger _logger;
 
+    /// <summary>Safeguards applied to every converter that supports them; edit values between conversions.</summary>
+    public ConversionSettings Settings { get; } = new();
+
     public ConversionService(ConverterRegistry registry, MusicXmlSerializer serializer, ILogger? logger = null)
     {
         _registry = registry;
@@ -44,6 +47,7 @@ public sealed class ConversionService
                 ConversionErrorCategory.UnsupportedFormat)
             { FilePath = inputPath });
 
+        (converter as IConfigurableConverter)?.Configure(Settings);
         var version = musicXmlVersion ?? _serializer.DefaultVersion;
         _logger.Info($"Pipeline started: '{inputPath}' -> '{outputPath}' via {converter.FormatName}, MusicXML {version}.");
 

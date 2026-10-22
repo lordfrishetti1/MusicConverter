@@ -1,0 +1,59 @@
+<Window x:Class="MusicConverter.App.SettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="Settings" Width="560" SizeToContent="Height" ResizeMode="NoResize"
+        WindowStartupLocation="CenterOwner" ShowInTaskbar="False">
+    <Window.Resources>
+        <Style TargetType="TextBox">
+            <Setter Property="Width" Value="90" />
+            <Setter Property="Padding" Value="4" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+        <Style x:Key="Hint" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="DimGray" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="Margin" Value="0,2,0,12" />
+        </Style>
+    </Window.Resources>
+    <StackPanel Margin="16">
+        <GroupBox Header="Safeguards" Padding="10" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock Text="Maximum nesting depth" FontWeight="SemiBold" />
+                <TextBox Text="{Binding MaxNestingDepth, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Style="{StaticResource Hint}"
+                           Text="LilyPond and MEI levels allowed before a file fails. Prevents stack overflow crashes (10–1000)." />
+
+                <TextBlock Text="Maximum input file size (MB)" FontWeight="SemiBold" />
+                <TextBox Text="{Binding MaxInputMegabytes, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Style="{StaticResource Hint}" Text="Larger files are rejected before being read, bounding memory use (1–2048)." />
+
+                <TextBlock Text="Per-file timeout in batches (seconds)" FontWeight="SemiBold" />
+                <TextBox Text="{Binding PerFileTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Style="{StaticResource Hint}" Text="A file taking longer is failed and the batch continues. 0 disables the limit." />
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Header="Error handling" Padding="10" Margin="0,0,0,10">
+            <StackPanel>
+                <CheckBox Content="Lenient mode: skip malformed input with a warning" IsChecked="{Binding Lenient}" />
+                <TextBlock Style="{StaticResource Hint}" Text="When off, the first malformed construct fails the file." />
+
+                <TextBlock Text="Maximum skipped errors per file" FontWeight="SemiBold" />
+                <TextBox Text="{Binding MaxRecoveries, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Style="{StaticResource Hint}" Text="Lenient mode gives up on a file after this many skipped errors." />
+
+                <TextBlock Text="Maximum warnings per file" FontWeight="SemiBold" />
+                <TextBox Text="{Binding MaxWarnings, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,0" Text="Further warnings are suppressed (1–100000)." />
+            </StackPanel>
+        </GroupBox>
+
+        <DockPanel>
+            <Button Content="Restore defaults" DockPanel.Dock="Left" Padding="12,4" Click="OnRestoreDefaults" />
+            <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                <Button Content="Save" Padding="16,4" IsDefault="True" Click="OnSave" />
+                <Button Content="Cancel" Padding="16,4" Margin="8,0,0,0" IsCancel="True" />
+            </StackPanel>
+        </DockPanel>
+    </StackPanel>
+</Window>

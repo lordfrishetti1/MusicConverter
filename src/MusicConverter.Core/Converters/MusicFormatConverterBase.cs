@@ -9,11 +9,19 @@ namespace MusicConverter.Converters;
 /// Template for converters: reads the file, parses to the neutral model, maps to MusicXML, and
 /// handles progress, logging and exception wrapping. Subclasses only implement <see cref="Parse"/>.
 /// </summary>
-public abstract class MusicFormatConverterBase : IMusicFormatConverter
+public abstract class MusicFormatConverterBase : IMusicFormatConverter, IConfigurableConverter
 {
     protected MusicFormatConverterBase(ILogger? logger) => Logger = logger ?? NullLogger.Instance;
 
     protected ILogger Logger { get; }
+
+    public ConversionSettings Settings { get; private set; } = new();
+
+    public void Configure(ConversionSettings settings)
+    {
+        Settings = settings.Clone();
+        Lenient = settings.Lenient;
+    }
 
     /// <summary>When true (default) malformed constructs are skipped with a warning so damaged files can still be converted.</summary>
     public bool Lenient { get; set; } = true;
@@ -35,7 +43,7 @@ public abstract class MusicFormatConverterBase : IMusicFormatConverter
     public async Task<MusicXmlDocument> ConvertAsync(
         string filePath, IProgress<ConversionProgress>? progress, CancellationToken cancellationToken = default)
     {
-        var context = new ConversionContext(filePath, FormatName, Logger, progress, cancellationToken) { Lenient = Lenient };
+        var context = new ConversionContext(filePath, FormatName, Logger, progress, cancellationToken) { Lenient = Lenient, Settings = Settings };
         Logger.Info($"Conversion started: converter '{FormatName}', file '{filePath}'.");
 
         try
@@ -76,6 +84,7 @@ public abstract class MusicFormatConverterBase : IMusicFormatConverter
     {
         try
         {
+            context.EnsureInputSize(filePath);
             return await File.ReadAllTextAsync(filePath, context.CancellationToken).ConfigureAwait(false);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)

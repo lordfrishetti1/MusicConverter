@@ -6,6 +6,12 @@ namespace MusicConverter.App;
 
 public partial class MainWindow : Window
 {
+    public MusicConverter.Abstractions.ConversionSettings Settings { get; init; } = new();
+    public Action<MusicConverter.Abstractions.ConversionSettings> SaveSettings { get; init; } = _ => { };
+
+    private void OnOpenSettings(object sender, RoutedEventArgs e) =>
+        new SettingsWindow(Settings, SaveSettings) { Owner = this }.ShowDialog();
+
     public MainWindow()
     {
         InitializeComponent();

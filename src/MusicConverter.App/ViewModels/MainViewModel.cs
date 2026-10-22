@@ -147,6 +147,7 @@ public sealed class MainViewModel : ViewModelBase
     public ICommand ClearLogCommand { get; }
 
     public bool IsBusy => Status == ConversionStatus.Running;
+    public bool CanEditSettings => !IsBusy;
 
     public string InputPath
     {
@@ -204,6 +205,7 @@ public sealed class MainViewModel : ViewModelBase
         {
             if (!Set(ref _status, value)) return;
             Raise(nameof(IsBusy));
+            Raise(nameof(CanEditSettings));
             RefreshCommands();
         }
     }

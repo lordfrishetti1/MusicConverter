@@ -125,13 +125,22 @@ public sealed class BatchConversionService
                 continue;
             }
 
+            using var fileCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            var timeout = _service.Settings.PerFileTimeout;
+            if (timeout is { } limit) fileCts.CancelAfter(limit);
             try
             {
                 var dir = Path.GetDirectoryName(output);
                 if (!string.IsNullOrEmpty(dir)) Directory.CreateDirectory(dir);
-                var result = await _service.ConvertFileAsync(input, output, options.MusicXmlVersion, fileProgress, cancellationToken)
+                var result = await _service.ConvertFileAsync(input, output, options.MusicXmlVersion, fileProgress, fileCts.Token)
                     .ConfigureAwait(false);
                 results.Add(new BatchItemResult(input, output, BatchItemStatus.Succeeded, Result: result));
+            }
+            catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+            {
+                _logger.Error($"Batch item timed out after {timeout}: '{input}'.");
+                TryDelete(output);
+                results.Add(new BatchItemResult(input, output, BatchItemStatus.Failed, $"Timed out after {timeout}"));
             }
             catch (OperationCanceledException)
             {
@@ -152,6 +161,11 @@ public sealed class BatchConversionService
         foreach (var item in batch.WithWarnings)
             _logger.Warning($"'{item.InputPath}' converted with {item.Result!.WarningCount} warning(s): {string.Join(" | ", item.Result.Warnings ?? Array.Empty<string>())}");
         return batch;
+    }
+
+    private static void TryDelete(string path)
+    {
+        try { File.Delete(path); } catch (Exception ex) when (ex is IOException or UnauthorizedAccessException) { }
     }
 
     private static string ResolveOutputPath(string root, string input, BatchOptions options, bool keepSourceExtension = false)

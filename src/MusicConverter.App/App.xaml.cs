@@ -31,6 +31,8 @@ public partial class App : Application
         var service = new ConversionService(registry, serializer, logger);
         var batch = new BatchConversionService(registry, service, logger);
         var viewModel = new MainViewModel(service, batch, registry, serializer, new WpfFileDialogService(), uiLogger, logger);
+        var settingsStore = new SettingsStore(logger);
+        service.Settings.CopyFrom(settingsStore.Load());
 
         DispatcherUnhandledException += (_, args) =>
         {
@@ -39,6 +41,6 @@ public partial class App : Application
             args.Handled = true;
         };
 
-        new MainWindow { DataContext = viewModel }.Show();
+        new MainWindow { DataContext = viewModel, Settings = service.Settings, SaveSettings = settingsStore.Save }.Show();
     }
 }
