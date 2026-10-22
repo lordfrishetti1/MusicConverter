@@ -132,6 +132,7 @@ internal sealed class MidiParser
     private readonly List<KeySignature> _keySignatures = new();
     private readonly List<TempoEvent> _tempoEvents = new();
     private int _position;
+    private long _totalNotes;
     private int _sourceTicksPerQuarter;
 
     // All parsed positions are rescaled to the neutral resolution (DurationHelper.TicksPerQuarter per quarter).
@@ -331,7 +332,12 @@ internal sealed class MidiParser
                 if (active.TryGetValue(key, out var starts) && starts.Count > 0)
                 {
                     var start = starts.Pop();
-                    if (tick > start) notes.Add(new MidiNote(Scale(start), Scale(tick), data1, channel));
+                    if (tick > start)
+                    {
+                        if (++_totalNotes > _context.Settings.MaxMidiNotes)
+                            throw _context.LimitError($"MIDI file has more than {_context.Settings.MaxMidiNotes:N0} notes.");
+                        notes.Add(new MidiNote(Scale(start), Scale(tick), data1, channel));
+                    }
                     else _context.Warn("Zero-duration MIDI notes were ignored.");
                 }
                 else _context.Warn("MIDI note-off events without a matching note-on were ignored.");

@@ -77,11 +77,13 @@ public sealed class ConversionContext
             throw Limit($"File is too large ({length / (1024 * 1024)} MB; limit {Settings.MaxInputMegabytes} MB).");
     }
 
-    private ConversionException Limit(string message) => new(message, ConversionErrorCategory.LimitExceeded)
+    public ConversionException LimitError(string message) => new(message, ConversionErrorCategory.LimitExceeded)
     {
         FilePath = FilePath,
         ConverterName = ConverterName
     };
+
+    private ConversionException Limit(string message) => LimitError(message);
 
     /// <summary>
     /// Handles a recoverable parse error: in lenient mode logs it as a warning and returns true so the caller can
@@ -89,7 +91,7 @@ public sealed class ConversionContext
     /// </summary>
     public bool Recover(Exception error)
     {
-        if (!Lenient || error is OperationCanceledException) return false;
+        if (!Lenient || error is OperationCanceledException or System.Text.RegularExpressions.RegexMatchTimeoutException) return false;
         if (error is ConversionException { Category: not ConversionErrorCategory.ParseError }) return false;
         if (++_recoveries > Settings.MaxRecoveries) return false;
         Warn($"Skipped malformed input: {error.Message}");

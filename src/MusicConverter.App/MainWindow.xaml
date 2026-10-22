@@ -62,6 +62,9 @@
                       Visibility="{Binding IsBatchMode, Converter={StaticResource BoolToVis}}" />
             <CheckBox Content="Overwrite existing" IsChecked="{Binding Overwrite}" Margin="14,0,0,0" VerticalAlignment="Center"
                       Visibility="{Binding IsBatchMode, Converter={StaticResource BoolToVis}}" />
+            <CheckBox Content="Resume previous run" IsChecked="{Binding Resume}" Margin="14,0,0,0" VerticalAlignment="Center"
+                      ToolTip="Skip files an interrupted earlier run already finished."
+                      Visibility="{Binding IsBatchMode, Converter={StaticResource BoolToVis}}" />
         </StackPanel>
         </DockPanel>
 
@@ -107,6 +110,8 @@
 
         <DockPanel Grid.Row="4" Margin="0,0,0,12">
             <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                <Button Content="Retry failed" Command="{Binding RetryFailedCommand}"
+                        Visibility="{Binding HasFailedFiles, Converter={StaticResource BoolToVis}}" />
                 <Button Content="Convert" Command="{Binding ConvertCommand}" IsDefault="True" />
                 <Button Content="Cancel" Command="{Binding CancelCommand}" />
             </StackPanel>

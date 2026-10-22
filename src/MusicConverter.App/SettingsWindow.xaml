@@ -15,6 +15,7 @@
             <Setter Property="Margin" Value="0,2,0,12" />
         </Style>
     </Window.Resources>
+    <ScrollViewer VerticalScrollBarVisibility="Auto" MaxHeight="720">
     <StackPanel Margin="16">
         <GroupBox Header="Safeguards" Padding="10" Margin="0,0,0,10">
             <StackPanel>
@@ -27,9 +28,37 @@
                 <TextBox Text="{Binding MaxInputMegabytes, UpdateSourceTrigger=PropertyChanged}" />
                 <TextBlock Style="{StaticResource Hint}" Text="Larger files are rejected before being read, bounding memory use (1–2048)." />
 
+                <TextBlock Text="Maximum MIDI notes per file" FontWeight="SemiBold" />
+                <TextBox Text="{Binding MaxMidiNotes, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Style="{StaticResource Hint}" Text="MIDI files with more notes are rejected (1,000–50,000,000)." />
+
                 <TextBlock Text="Per-file timeout in batches (seconds)" FontWeight="SemiBold" />
                 <TextBox Text="{Binding PerFileTimeoutSeconds, UpdateSourceTrigger=PropertyChanged}" />
                 <TextBlock Style="{StaticResource Hint}" Text="A file taking longer is failed and the batch continues. 0 disables the limit." />
+
+                <CheckBox Content="Convert each file in a separate worker process" IsChecked="{Binding IsolateProcesses}" />
+                <TextBlock Style="{StaticResource Hint}"
+                           Text="A crash or hang then only fails that file, and a timed-out file is terminated. Slower: each file pays a process start-up cost." />
+            </StackPanel>
+        </GroupBox>
+
+        <GroupBox Header="Batch throttling" Padding="10" Margin="0,0,0,10">
+            <StackPanel>
+                <TextBlock Text="Files converted at the same time" FontWeight="SemiBold" />
+                <TextBox Text="{Binding MaxConcurrentFiles, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Style="{StaticResource Hint}" Text="1 is sequential and the safest (1–64). Higher values use more CPU and memory." />
+
+                <CheckBox Content="Run at low priority" IsChecked="{Binding LowPriority}" />
+                <TextBlock Style="{StaticResource Hint}" Text="Keeps the rest of the system responsive during a batch." />
+
+                <TextBlock Text="Pause between files (milliseconds)" FontWeight="SemiBold" />
+                <TextBox Text="{Binding DelayBetweenFilesMs, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Style="{StaticResource Hint}" Text="0–60000." />
+
+                <TextBlock Text="Pause when memory use is above (%)" FontWeight="SemiBold" />
+                <TextBox Text="{Binding PauseWhenMemoryAbovePercent, UpdateSourceTrigger=PropertyChanged}" />
+                <TextBlock Style="{StaticResource Hint}" Margin="0,2,0,0"
+                           Text="The batch waits before starting the next file until memory use drops (50–99). 0 disables." />
             </StackPanel>
         </GroupBox>
 
@@ -56,4 +85,5 @@
             </StackPanel>
         </DockPanel>
     </StackPanel>
+    </ScrollViewer>
 </Window>

@@ -52,7 +52,10 @@ public sealed class MainViewModel : ViewModelBase
     private readonly RelayCommand _cancelCommand;
     private CancellationTokenSource? _cts;
 
-    private bool _isBatchMode, _recursive = true, _overwrite;
+    private bool _isBatchMode, _recursive = true, _overwrite, _resume;
+    private IReadOnlyCollection<string> _failedFiles = Array.Empty<string>();
+    private IReadOnlyCollection<string>? _retryOnly;
+    private readonly AsyncRelayCommand _retryCommand;
     private int _batchIndex = 1, _batchTotal = 1;
     private string _inputPath = string.Empty;
     private string _outputPath = string.Empty;
@@ -85,6 +88,14 @@ public sealed class MainViewModel : ViewModelBase
         _convertCommand = new AsyncRelayCommand(ConvertAsync, () => !IsBusy && InputPath.Length > 0
             && (IsBatchMode ? ExtensionFilters.Any(f => f.IsSelected) : OutputPath.Length > 0));
         _cancelCommand = new RelayCommand(() => _cts?.Cancel(), () => IsBusy);
+        _retryCommand = new AsyncRelayCommand(RetryFailedAsync, () => HasFailedFiles && IsBatchMode);
+    }
+
+    private async Task RetryFailedAsync()
+    {
+        _retryOnly = _failedFiles;
+        try { await ConvertAsync(); }
+        finally { _retryOnly = null; }
     }
 
     public bool IsBatchMode
@@ -134,6 +145,9 @@ public sealed class MainViewModel : ViewModelBase
         RefreshCommands();
     }
     public bool Overwrite { get => _overwrite; set => Set(ref _overwrite, value); }
+    public bool Resume { get => _resume; set => Set(ref _resume, value); }
+    public bool HasFailedFiles => _failedFiles.Count > 0 && !IsBusy;
+    public ICommand RetryFailedCommand => _retryCommand;
     public string InputLabel => IsBatchMode ? "Input folder" : "Input file";
     public string OutputLabel => IsBatchMode ? "Output folder" : "Output file";
 
@@ -213,6 +227,8 @@ public sealed class MainViewModel : ViewModelBase
     private void RefreshCommands()
     {
         _convertCommand.RaiseCanExecuteChanged();
+        _retryCommand.RaiseCanExecuteChanged();
+        Raise(nameof(HasFailedFiles));
         _cancelCommand.RaiseCanExecuteChanged();
         (BrowseInputCommand as RelayCommand)?.RaiseCanExecuteChanged();
         (BrowseOutputCommand as RelayCommand)?.RaiseCanExecuteChanged();
@@ -258,6 +274,8 @@ public sealed class MainViewModel : ViewModelBase
         {
             Recursive = Recursive,
             Overwrite = Overwrite,
+            Resume = Resume || _retryOnly != null,
+            OnlyFiles = _retryOnly,
             MusicXmlVersion = SelectedVersion,
             OutputDirectory = string.IsNullOrWhiteSpace(OutputPath) ? null : OutputPath,
             Extensions = ExtensionFilters.Where(f => f.IsSelected).Select(f => f.Extension).ToArray()
@@ -275,6 +293,7 @@ public sealed class MainViewModel : ViewModelBase
         var result = await _batchService.ConvertDirectoryAsync(InputPath, options, batchProgress, fileProgress, _cts!.Token);
 
         var failures = result.Items.Where(i => i.Status == BatchItemStatus.Failed).ToList();
+        _failedFiles = failures.Select(f => f.InputPath).ToArray();
         if (failures.Count > 0)
             ErrorMessage = string.Join(Environment.NewLine,
                 failures.Take(10).Select(f => $"{Path.GetFileName(f.InputPath)}: {f.Message}")) +
@@ -282,7 +301,9 @@ public sealed class MainViewModel : ViewModelBase
 
         ProgressMessage = result.Items.Count == 0
             ? "No supported files found"
-            : $"{result.Succeeded} converted ({result.WithWarnings.Count} with warnings), {result.Failed} failed, {result.Skipped} skipped";
+            : $"{result.Succeeded} converted ({result.WithWarnings.Count} with warnings), {result.Failed} failed" +
+              (result.StoppedBySafeguards > 0 ? $" ({result.StoppedBySafeguards} stopped by safety limits)" : "") +
+              $", {result.Skipped} skipped";
         StatusText = ProgressMessage;
         Status = result.Failed > 0 ? ConversionStatus.Failed : ConversionStatus.Succeeded;
     }
@@ -290,6 +311,7 @@ public sealed class MainViewModel : ViewModelBase
     private async Task ConvertAsync()
     {
         _cts = new CancellationTokenSource();
+        if (_retryOnly == null) _failedFiles = Array.Empty<string>();
         ErrorMessage = null;
         OverallPercent = ParsingPercent = ConvertingPercent = SerializingPercent = 0;
         Status = ConversionStatus.Running;

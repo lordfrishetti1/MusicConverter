@@ -59,7 +59,18 @@ public sealed class MusicXmlSerializer
             var bytes = await Task.Run(() => SerializeToBytes(document, version), cancellationToken).ConfigureAwait(false);
             var directory = Path.GetDirectoryName(Path.GetFullPath(outputPath));
             if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
-            await File.WriteAllBytesAsync(outputPath, bytes, cancellationToken).ConfigureAwait(false);
+            // Write beside the target and rename, so an interrupted run never leaves a truncated output file.
+            var temp = $"{outputPath}.{Guid.NewGuid():N}.tmp";
+            try
+            {
+                await File.WriteAllBytesAsync(temp, bytes, cancellationToken).ConfigureAwait(false);
+                cancellationToken.ThrowIfCancellationRequested();
+                File.Move(temp, outputPath, overwrite: true);
+            }
+            finally
+            {
+                try { if (File.Exists(temp)) File.Delete(temp); } catch (IOException) { } catch (UnauthorizedAccessException) { }
+            }
             _logger.Info($"Wrote MusicXML to '{outputPath}'.");
         }
         catch (OperationCanceledException)

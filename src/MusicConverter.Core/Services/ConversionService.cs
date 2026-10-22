@@ -8,12 +8,23 @@ public sealed record ConversionResult(
     string InputPath, string OutputPath, string FormatName, string MusicXmlVersion, int WarningCount,
     IReadOnlyList<string>? Warnings = null);
 
+/// <summary>Converts one file to MusicXML. Implemented in-process by <see cref="ConversionService"/> and out-of-process by the worker runner.</summary>
+public interface IFileConverter
+{
+    Task<ConversionResult> ConvertFileAsync(
+        string inputPath, string outputPath, string? musicXmlVersion = null,
+        IProgress<ConversionProgress>? progress = null, CancellationToken cancellationToken = default);
+}
+
 /// <summary>End-to-end pipeline: pick converter → parse → map → serialize, with progress and cancellation.</summary>
-public sealed class ConversionService
+public sealed class ConversionService : IFileConverter
 {
     private readonly ConverterRegistry _registry;
     private readonly MusicXmlSerializer _serializer;
     private readonly ILogger _logger;
+
+    public ConverterRegistry Registry => _registry;
+    public MusicXmlSerializer Serializer => _serializer;
 
     /// <summary>Safeguards applied to every converter that supports them; edit values between conversions.</summary>
     public ConversionSettings Settings { get; } = new();

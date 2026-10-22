@@ -8,7 +8,8 @@ public enum ConversionErrorCategory
     MappingError,
     SerializationError,
     UnsupportedFormat,
-    LimitExceeded
+    LimitExceeded,
+    WorkerFailure
 }
 
 public class ConversionException : Exception

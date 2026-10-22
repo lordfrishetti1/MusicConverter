@@ -55,19 +55,32 @@ internal sealed class MeiParser
         _ctx = ctx;
     }
 
+    private static XDocument LoadXml(string text)
+    {
+        // DTDs are parsed (internal entities stay valid) but expansion is capped to defuse entity-expansion bombs.
+        var settings = new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Parse,
+            XmlResolver = null,
+            MaxCharactersFromEntities = 1_000_000
+        };
+        using var reader = XmlReader.Create(new StringReader(text), settings);
+        return XDocument.Load(reader, LoadOptions.SetLineInfo);
+    }
+
     public NeutralScore Parse()
     {
         XDocument doc;
         try
         {
-            doc = XDocument.Parse(_text, LoadOptions.SetLineInfo);
+            doc = LoadXml(_text);
         }
         catch (XmlException ex)
         {
             if (!_ctx.Lenient) throw _ctx.ParseError($"Invalid XML: {ex.Message}", ex.LineNumber > 0 ? ex.LineNumber : null);
             try
             {
-                doc = XDocument.Parse(RepairXml(_text), LoadOptions.SetLineInfo);
+                doc = LoadXml(RepairXml(_text));
                 _ctx.Warn($"The XML was malformed ({ex.Message}) and was repaired; some content may be missing.");
             }
             catch (XmlException)

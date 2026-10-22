@@ -1,3 +1,5 @@
+using System.Text.Json.Serialization;
+
 namespace MusicConverter.Abstractions;
 
 /// <summary>User-tunable safeguards and behaviour for conversions. Defaults are safe for large batches.</summary>
@@ -23,8 +25,28 @@ public sealed class ConversionSettings
     /// <summary>Seconds a single file may take in a batch before it is failed. 0 disables the limit.</summary>
     public int PerFileTimeoutSeconds { get; set; } = 300;
 
+    /// <summary>Most MIDI notes accepted per file; bounds memory use for huge sequences.</summary>
+    public int MaxMidiNotes { get; set; } = 2_000_000;
+
+    /// <summary>Files converted at the same time in a batch. 1 is sequential and the safest.</summary>
+    public int MaxConcurrentFiles { get; set; } = 1;
+
+    /// <summary>Runs the batch at below-normal process priority so the rest of the system stays responsive.</summary>
+    public bool LowPriority { get; set; }
+
+    /// <summary>Pause after every file, in milliseconds, to give the system breathing room.</summary>
+    public int DelayBetweenFilesMs { get; set; }
+
+    /// <summary>Waits before starting a file while system memory use is at or above this percentage. 0 disables.</summary>
+    public int PauseWhenMemoryAbovePercent { get; set; } = 90;
+
+    /// <summary>Converts each batch file in a separate worker process, so a crash or hang only fails that file.</summary>
+    public bool IsolateProcesses { get; set; }
+
+    [JsonIgnore]
     public long MaxInputBytes => MaxInputMegabytes * 1024L * 1024L;
 
+    [JsonIgnore]
     public TimeSpan? PerFileTimeout => PerFileTimeoutSeconds > 0 ? TimeSpan.FromSeconds(PerFileTimeoutSeconds) : null;
 
     public ConversionSettings Clone() => (ConversionSettings)MemberwiseClone();
@@ -37,12 +59,22 @@ public sealed class ConversionSettings
         MaxRecoveries = other.MaxRecoveries;
         MaxWarnings = other.MaxWarnings;
         PerFileTimeoutSeconds = other.PerFileTimeoutSeconds;
+        MaxMidiNotes = other.MaxMidiNotes;
+        MaxConcurrentFiles = other.MaxConcurrentFiles;
+        LowPriority = other.LowPriority;
+        DelayBetweenFilesMs = other.DelayBetweenFilesMs;
+        PauseWhenMemoryAbovePercent = other.PauseWhenMemoryAbovePercent;
+        IsolateProcesses = other.IsolateProcesses;
         Clamp();
     }
 
     /// <summary>Forces every value into a sane range (e.g. after loading a hand-edited file).</summary>
     public void Clamp()
     {
+        MaxMidiNotes = Math.Clamp(MaxMidiNotes, 1_000, 50_000_000);
+        MaxConcurrentFiles = Math.Clamp(MaxConcurrentFiles, 1, 64);
+        DelayBetweenFilesMs = Math.Clamp(DelayBetweenFilesMs, 0, 60_000);
+        PauseWhenMemoryAbovePercent = PauseWhenMemoryAbovePercent <= 0 ? 0 : Math.Clamp(PauseWhenMemoryAbovePercent, 50, 99);
         MaxNestingDepth = Math.Clamp(MaxNestingDepth, MinNestingDepth, MaxNestingDepthLimit);
         MaxInputMegabytes = Math.Clamp(MaxInputMegabytes, 1, 2048);
         MaxRecoveries = Math.Clamp(MaxRecoveries, 0, 100_000);

@@ -106,6 +106,10 @@ public abstract class MusicFormatConverterBase : IMusicFormatConverter, IConfigu
                 throw context.ParseError($"No musical content found in {FormatName} file.");
             return score;
         }
+        catch (System.Text.RegularExpressions.RegexMatchTimeoutException ex)
+        {
+            throw context.LimitError($"Parsing took too long on a pattern match and was stopped ({ex.MatchTimeout.TotalSeconds:0}s limit).");
+        }
         catch (Exception ex) when (ex is not (ConversionException or OperationCanceledException))
         {
             throw new ConversionException($"Unexpected {FormatName} parse failure: {ex.Message}",
