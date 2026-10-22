@@ -302,6 +302,7 @@ public sealed class MainViewModel : ViewModelBase
         ProgressMessage = result.Items.Count == 0
             ? "No supported files found"
             : $"{result.Succeeded} converted ({result.WithWarnings.Count} with warnings), {result.Failed} failed" +
+              (result.WithMismatches.Count > 0 ? $" ({result.WithMismatches.Count} with output mismatches, see log)" : "") +
               (result.StoppedBySafeguards > 0 ? $" ({result.StoppedBySafeguards} stopped by safety limits)" : "") +
               $", {result.Skipped} skipped";
         StatusText = ProgressMessage;
@@ -331,9 +332,12 @@ public sealed class MainViewModel : ViewModelBase
             var result = await _service.ConvertFileAsync(
                 InputPath, OutputPath, SelectedVersion, progress, _cts.Token);
             OnProgress(ConversionProgress.ForStage(ConversionStage.Completed, 1, "Conversion complete"));
-            StatusText = result.WarningCount > 0
-                ? $"Completed with {result.WarningCount} warning(s)"
-                : "Completed";
+            StatusText = result.HasMismatch
+                ? $"Completed, but verification found {result.VerificationIssues!.Count} difference(s)"
+                : result.WarningCount > 0
+                    ? $"Completed with {result.WarningCount} warning(s)"
+                    : result.Verified ? "Completed and verified" : "Completed";
+            if (result.HasMismatch) ErrorMessage = string.Join(Environment.NewLine, result.VerificationIssues!);
             Status = ConversionStatus.Succeeded;
         }
         catch (OperationCanceledException)

@@ -6,7 +6,12 @@ namespace MusicConverter.Services;
 
 public sealed record ConversionResult(
     string InputPath, string OutputPath, string FormatName, string MusicXmlVersion, int WarningCount,
-    IReadOnlyList<string>? Warnings = null);
+    IReadOnlyList<string>? Warnings = null, bool Verified = false, IReadOnlyList<string>? VerificationIssues = null)
+{
+    /// <summary>True when output verification ran and found differences.</summary>
+    [System.Text.Json.Serialization.JsonIgnore]
+    public bool HasMismatch => VerificationIssues is { Count: > 0 };
+}
 
 /// <summary>Converts one file to MusicXML. Implemented in-process by <see cref="ConversionService"/> and out-of-process by the worker runner.</summary>
 public interface IFileConverter
@@ -68,10 +73,22 @@ public sealed class ConversionService : IFileConverter
         cancellationToken.ThrowIfCancellationRequested();
         progress?.Report(ConversionProgress.ForStage(ConversionStage.Serializing, 0, $"Serializing MusicXML {version}"));
         await _serializer.SerializeToFileAsync(document, outputPath, version, cancellationToken).ConfigureAwait(false);
+        IReadOnlyList<string>? issues = null;
+        if (Settings.VerifyOutput)
+        {
+            progress?.Report(ConversionProgress.ForStage(ConversionStage.Serializing, 1, "Verifying output"));
+            issues = await Task.Run(() => OutputVerifier.Verify(document, inputPath, outputPath), cancellationToken).ConfigureAwait(false);
+            if (issues.Count > 0)
+                _logger.Warning($"Output verification found {issues.Count} difference(s) in '{outputPath}': {string.Join(" | ", issues)}");
+            else
+                _logger.Info($"Output verification passed for '{outputPath}'.");
+        }
+
         progress?.Report(ConversionProgress.ForStage(ConversionStage.Completed, 1, "Conversion complete"));
 
         _logger.Info($"Pipeline finished: '{outputPath}' ({document.Warnings.Count} warning(s)).");
-        return new ConversionResult(inputPath, outputPath, converter.FormatName, version, document.Warnings.Count, document.Warnings.ToArray());
+        return new ConversionResult(inputPath, outputPath, converter.FormatName, version, document.Warnings.Count,
+            document.Warnings.ToArray(), Settings.VerifyOutput, issues);
     }
 
     private ConversionException Log(ConversionException exception)

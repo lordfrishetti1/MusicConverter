@@ -43,6 +43,9 @@ public sealed class ConversionSettings
     /// <summary>Converts each batch file in a separate worker process, so a crash or hang only fails that file.</summary>
     public bool IsolateProcesses { get; set; }
 
+    /// <summary>Re-reads each written file and compares it with the converted model (and, for MIDI, the source note count).</summary>
+    public bool VerifyOutput { get; set; }
+
     [JsonIgnore]
     public long MaxInputBytes => MaxInputMegabytes * 1024L * 1024L;
 
@@ -65,6 +68,7 @@ public sealed class ConversionSettings
         DelayBetweenFilesMs = other.DelayBetweenFilesMs;
         PauseWhenMemoryAbovePercent = other.PauseWhenMemoryAbovePercent;
         IsolateProcesses = other.IsolateProcesses;
+        VerifyOutput = other.VerifyOutput;
         Clamp();
     }
 

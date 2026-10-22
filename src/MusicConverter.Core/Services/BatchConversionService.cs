@@ -48,6 +48,10 @@ public sealed record BatchResult(IReadOnlyList<BatchItemResult> Items)
     public IReadOnlyList<BatchItemResult> WithWarnings =>
         Items.Where(i => i.Result is { WarningCount: > 0 }).ToList();
 
+    /// <summary>Converted files whose written output differs from the converted score or the MIDI source.</summary>
+    public IReadOnlyList<BatchItemResult> WithMismatches =>
+        Items.Where(i => i.Result is { HasMismatch: true }).ToList();
+
     /// <summary>Failures caused by a safety limit, timeout or worker crash rather than by bad content.</summary>
     public int StoppedBySafeguards => Items.Count(i => i.Status == BatchItemStatus.Failed && i.Message is { } m &&
         (m.StartsWith(nameof(ConversionErrorCategory.LimitExceeded)) || m.StartsWith(nameof(ConversionErrorCategory.WorkerFailure)) ||
@@ -226,7 +230,7 @@ public sealed class BatchConversionService
         progress?.Report(new BatchProgress(total, total, string.Empty, 100, "Batch complete"));
         var batch = new BatchResult(results.Select(r => r!).ToList());
         _logger.Info($"Batch finished: {batch.Succeeded} succeeded, {batch.Failed} failed, {batch.Skipped} skipped, " +
-                     $"{batch.WithWarnings.Count} with warnings, {batch.StoppedBySafeguards} stopped by safeguards.");
+                     $"{batch.WithWarnings.Count} with warnings, {batch.WithMismatches.Count} with output mismatches, {batch.StoppedBySafeguards} stopped by safeguards.");
         if (batch.Failed == 0) manifest.Delete();
         return batch;
     }
@@ -271,6 +275,8 @@ public sealed class BatchConversionService
             manifest.MarkDone(input);
             if (result.WarningCount > 0)
                 _logger.Warning($"'{input}' converted with {result.WarningCount} warning(s): {string.Join(" | ", result.Warnings ?? Array.Empty<string>())}");
+            if (result.HasMismatch)
+                _logger.Warning($"'{input}' output differs from its source: {string.Join(" | ", result.VerificationIssues!)}");
             // Only a sample of the warning text is kept so a huge batch does not hold every message in memory.
             result = result with { Warnings = result.Warnings?.Take(KeptWarningsPerFile).ToArray() };
             return new BatchItemResult(input, output, BatchItemStatus.Succeeded, Result: result);
