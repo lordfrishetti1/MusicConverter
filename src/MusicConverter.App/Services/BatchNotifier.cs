@@ -2,11 +2,6 @@ using MusicConverter.Abstractions;
 
 namespace MusicConverter.App.Services;
 
-public interface IBatchNotifier
-{
-    void BatchCompleted(string summary, bool hadFailures);
-}
-
 /// <summary>Shows a tray toast and/or plays a sound when a batch finishes, per <see cref="ConversionSettings"/>.</summary>
 public sealed class BatchNotifier : IBatchNotifier, IDisposable
 {

@@ -1,13 +1,5 @@
 namespace MusicConverter.Abstractions;
 
-public enum ConversionStage
-{
-    Parsing,
-    Converting,
-    Serializing,
-    Completed
-}
-
 /// <summary>
 /// Progress snapshot. <see cref="Percent"/> is overall (0-100); <see cref="StagePercent"/> is within <see cref="Stage"/>.
 /// Parsing owns 0-45, converting (mapping to MusicXML) 45-70, serializing 70-100.

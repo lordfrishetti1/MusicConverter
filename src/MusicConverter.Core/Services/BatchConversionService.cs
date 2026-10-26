@@ -4,60 +4,6 @@ using MusicConverter.Logging;
 
 namespace MusicConverter.Services;
 
-public enum BatchItemStatus
-{
-    Succeeded,
-    Failed,
-    Skipped
-}
-
-public sealed record BatchItemResult(
-    string InputPath, string OutputPath, BatchItemStatus Status, string? Message = null, ConversionResult? Result = null);
-
-public sealed record BatchOptions
-{
-    public bool Recursive { get; init; } = true;
-
-    /// <summary>When null, each output is written next to its input; otherwise the relative folder layout is mirrored here.</summary>
-    public string? OutputDirectory { get; init; }
-
-    public bool Overwrite { get; init; }
-    public string? MusicXmlVersion { get; init; }
-    public string OutputExtension { get; init; } = ".musicxml";
-
-    /// <summary>Input extensions (e.g. ".mid") to process. Null or empty means every supported extension.</summary>
-    public IReadOnlyCollection<string>? Extensions { get; init; }
-
-    /// <summary>Skips files an earlier, interrupted run already finished (even when <see cref="Overwrite"/> is set).</summary>
-    public bool Resume { get; init; }
-
-    /// <summary>When set, only these input files are processed (used to retry failures).</summary>
-    public IReadOnlyCollection<string>? OnlyFiles { get; init; }
-}
-
-/// <summary>Progress for a batch: which file is running and how far along the whole batch is.</summary>
-public sealed record BatchProgress(int Index, int Total, string CurrentFile, double OverallPercent, string Message);
-
-public sealed record BatchResult(IReadOnlyList<BatchItemResult> Items)
-{
-    public int Succeeded => Items.Count(i => i.Status == BatchItemStatus.Succeeded);
-    public int Failed => Items.Count(i => i.Status == BatchItemStatus.Failed);
-    public int Skipped => Items.Count(i => i.Status == BatchItemStatus.Skipped);
-
-    /// <summary>Converted files whose conversion dropped or approximated content.</summary>
-    public IReadOnlyList<BatchItemResult> WithWarnings =>
-        Items.Where(i => i.Result is { WarningCount: > 0 }).ToList();
-
-    /// <summary>Converted files whose written output differs from the converted score or the MIDI source.</summary>
-    public IReadOnlyList<BatchItemResult> WithMismatches =>
-        Items.Where(i => i.Result is { HasMismatch: true }).ToList();
-
-    /// <summary>Failures caused by a safety limit, timeout or worker crash rather than by bad content.</summary>
-    public int StoppedBySafeguards => Items.Count(i => i.Status == BatchItemStatus.Failed && i.Message is { } m &&
-        (m.StartsWith(nameof(ConversionErrorCategory.LimitExceeded)) || m.StartsWith(nameof(ConversionErrorCategory.WorkerFailure)) ||
-         m.StartsWith("Timed out")));
-}
-
 /// <summary>Converts every supported file in a directory. A failing file never stops the batch; cancellation does.</summary>
 public sealed class BatchConversionService
 {

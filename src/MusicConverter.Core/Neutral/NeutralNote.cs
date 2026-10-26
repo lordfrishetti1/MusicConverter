@@ -1,30 +1,5 @@
 namespace MusicConverter.Neutral;
 
-/// <summary>Format-independent score produced by parsers and consumed by the MusicXML mapper.</summary>
-public sealed class NeutralScore
-{
-    public string? Title { get; set; }
-    public string? Composer { get; set; }
-    public List<NeutralPart> Parts { get; } = new();
-}
-
-public sealed class NeutralPart
-{
-    public string Name { get; set; } = "Part";
-    public List<NeutralMeasure> Measures { get; } = new();
-}
-
-public sealed class NeutralAttributes
-{
-    public int? Fifths { get; set; }
-    public int? Beats { get; set; }
-    public int? BeatType { get; set; }
-    public string? ClefSign { get; set; }
-    public int? ClefLine { get; set; }
-}
-
-public sealed record NeutralPitch(char Step, int Alter, int Octave);
-
 public sealed class NeutralNote
 {
     /// <summary>Empty for rests; several entries for chords.</summary>
@@ -63,9 +38,3 @@ public sealed class NeutralNote
 
     public List<NeutralLyric> Lyrics { get; } = new();
 }
-
-/// <summary>A dynamic, wedge, tempo, words or pedal mark; <see cref="Kind"/> uses the MusicXML.DirectionKinds constants.</summary>
-public sealed record NeutralDirection(string Kind, string Value, string? Unit = null);
-
-/// <summary>A lyric syllable; <see cref="Syllabic"/> is single, begin, middle or end.</summary>
-public sealed record NeutralLyric(int Number, string Text, string Syllabic);

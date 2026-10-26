@@ -4,23 +4,6 @@ using MusicConverter.MusicXml;
 
 namespace MusicConverter.Services;
 
-public sealed record ConversionResult(
-    string InputPath, string OutputPath, string FormatName, string MusicXmlVersion, int WarningCount,
-    IReadOnlyList<string>? Warnings = null, bool Verified = false, IReadOnlyList<string>? VerificationIssues = null)
-{
-    /// <summary>True when output verification ran and found differences.</summary>
-    [System.Text.Json.Serialization.JsonIgnore]
-    public bool HasMismatch => VerificationIssues is { Count: > 0 };
-}
-
-/// <summary>Converts one file to MusicXML. Implemented in-process by <see cref="ConversionService"/> and out-of-process by the worker runner.</summary>
-public interface IFileConverter
-{
-    Task<ConversionResult> ConvertFileAsync(
-        string inputPath, string outputPath, string? musicXmlVersion = null,
-        IProgress<ConversionProgress>? progress = null, CancellationToken cancellationToken = default);
-}
-
 /// <summary>End-to-end pipeline: pick converter → parse → map → serialize, with progress and cancellation.</summary>
 public sealed class ConversionService : IFileConverter
 {
